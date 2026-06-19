@@ -28,10 +28,10 @@ The program can then genarate a number of different items. The entire case can b
 
 - **Python**: Python is required to run the program. This was built using Python 3.8.10 but I expect newer versions should work fine
 
-- **[SolidPython](https**://github.com/SolidCode/SolidPython)**: This program relies on SolidPython to generate the actual OpenSCAD script. To install SolidPython you can use the requirements.txt included in this repository
+- **[SolidPython](https**://github.com/SolidCode/SolidPython)**: This program relies on SolidPython to generate the actual OpenSCAD script. Dependencies are managed with [Poetry](https://python-poetry.org/). Install them with:
 
   ```
-  pip install -r requirements.txt
+  poetry install
   ```
 - **[OpenSCAD](https://openscad.org/)**: In order to render STL files you will have to have OpenSCAD installed and the OpenSCAD executable must be on your path. OpenSCAD downloads can be found here https://openscad.org/downloads.html
 
@@ -42,7 +42,7 @@ The program can then genarate a number of different items. The entire case can b
 - Basic usage
   
   ```
-  python keyboard_stl_generator.py -i layout_filename.json
+  poetry run python keyboard_stl_generator.py -i layout_filename.json
   ```
 
   This will generate the entire case as one peice. IT will generate top, bottom, plate, and all scad files
