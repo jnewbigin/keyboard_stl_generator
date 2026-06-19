@@ -57,7 +57,7 @@ class SwitchConfig():
         #       mx_openable: cutout that allows opening pcb mounted switches
         #       mx: best for hand wiring. Cannot open PCB mounted switches
         #       mx_alps: supports mx and alps switches. Allows opening PCB mounted mx switches
-        #       alps: standar alps cutout
+        #       alps: standard alps cutout
         self.switch_type_function_dict = {
             'mx_openable': self.mx_openable_switch_cutout,
             'mx': self.mx_switch_cutout,
@@ -77,7 +77,8 @@ class SwitchConfig():
             'cherry_costar': self.cherry_costar_stab_cutout,
             'cherry': self.cherry_stab_cutout,
             'costar': self.costar_stab_cutout,
-            'alps': self.alps_stab_cutout
+            'alps': self.alps_stab_cutout,
+            'custom': self.custom_stab_cutout,
         }
 
 
@@ -423,6 +424,63 @@ class SwitchConfig():
 
             self.logger.debug(support_cutout_poly_points)
             return poly_points, support_cutout_poly_points
+
+        else:
+            return None, None
+
+    def custom_stab_cutout(self, key_width = 1.0):
+        s = self.get_cherry_stab_cutout_spacing(key_width = key_width)
+
+        if s != -1:
+            radius = 0.8
+            distance = -7.2
+            d = 0.2 # the hole needs to shifted a fraction
+            # the screw hole cutout
+            stab_cutout_poly_points = [
+                [s - radius - self.kerf + d, distance - radius - self.kerf], # 0
+                [s + radius + self.kerf + d, distance - radius - self.kerf], # 1
+                [s + radius + self.kerf + d, distance + radius + self.kerf], # 2
+                [s - radius - self.kerf + d, distance + radius + self.kerf] # 3
+            ]
+
+            # the main stab cutout
+            hwidth = 3.6 # width = 6
+            hheight = 5.6 # height = 11
+            extra = 2 # extra clearance at the centerline for the bar
+            poly_points = [
+                [s - hwidth - self.kerf , -hheight - self.kerf], # 0
+                [s + hwidth + self.kerf , -hheight - self.kerf], # 1
+                [s + hwidth + self.kerf, hheight + self.kerf ],
+                [s  , hheight + extra + self.kerf],# arrow head to make room for the bar
+                [s - hwidth - self.kerf , hheight + self.kerf ] # 3
+            ]
+
+            test_points = [
+                [s - 1, -1],
+                [s + 1, -1],
+                [s + 1, 1],
+                [s - 1, 1],
+            ]
+
+            # copied from alps_stab_cutout
+            # clear the support area around the stabs
+            swidth = 4.2
+            sheight = 10
+            bar_length = 20
+            bar_width = 2
+            offset = 0.5 # we shave an extra 0.5mm off the top but don't want to go all the way through the support
+
+            support_cutout_poly_points = [
+                [s - swidth - self.kerf , -sheight - self.kerf], # bottom left
+                [s + swidth + self.kerf , -sheight - self.kerf], # bottom right
+                [s + swidth + self.kerf, sheight + self.kerf + offset ], # top right
+                [s - swidth - self.kerf - bar_length, sheight + self.kerf + offset],
+                [s - swidth - self.kerf - bar_length, sheight + self.kerf - bar_width ],
+                [s - swidth - self.kerf, sheight + self.kerf - bar_width]
+            ]
+
+
+            return poly_points, support_cutout_poly_points, [("stab_cutout", stab_cutout_poly_points), ("support_infill", test_points)]
 
         else:
             return None, None

@@ -4,8 +4,9 @@ import sys
 from pathlib import PurePath
 
 from switch_config import SwitchConfig
-# from cell import Cell
 
+
+# from cell import Cell
 
 
 class Parameters():
@@ -20,7 +21,7 @@ class Parameters():
 
         # self.default_parameter_dict = {
         #     'plate_supports': True,
-            
+
         #     'x_build_size' : 200,
         #     'y_build_size' : 200,
 
@@ -60,7 +61,6 @@ class Parameters():
         #     'cable_hole_down_offset': 1
         # }
 
-
         self.paramater_alternate_dict = {
             'plate_wall_thickness': 'case_wall_thickness'
         }
@@ -75,7 +75,7 @@ class Parameters():
         self.stabilizer_type = 'cherry_costar'
 
         # Custom Switch Cutout Attributes
-        self.custom_shape = False 
+        self.custom_shape = False
         self.custom_shape_points = None
         self.custom_shape_path = None
 
@@ -137,7 +137,7 @@ class Parameters():
         self.test_block_z_end = 0
 
         self.switch_config = None
-        
+
         self.min_x = 0.0
         self.max_x = 0.0
         self.min_y = 0.0
@@ -167,17 +167,16 @@ class Parameters():
             self.build_attr_from_dict(self.parameter_dict)
 
         # self.validate_parameters()
-        
 
     def __repr__(self):
         output = 'Parameters:\n'
         ignore_attr_names = [
-            'logger', 'parameter_dict', 'switch_config', 
-            'min_x', 'max_x', 'min_y', 'max_y', 
-            'real_max_x', 'real_max_y', 
+            'logger', 'parameter_dict', 'switch_config',
+            'min_x', 'max_x', 'min_y', 'max_y',
+            'real_max_x', 'real_max_y',
             # 'real_case_width', 'real_case_height', 
-            'case_height_extra', 'case_height_base_removed', 'case_height_extra_fill', 'side_margin_diff', 
-            'top_margin_diff', 'screw_tap_hole_diameter', 'screw_hole_body_diameter', 'screw_hole_body_radius', 
+            'case_height_extra', 'case_height_base_removed', 'case_height_extra_fill', 'side_margin_diff',
+            'top_margin_diff', 'screw_tap_hole_diameter', 'screw_hole_body_diameter', 'screw_hole_body_radius',
             'x_screw_width', 'y_screw_width', 'bottom_section_count', 'screw_hole_body_support_end_x',
             'test_block', 'test_block_x_start', 'test_block_x_end', 'test_block_y_start',
             'test_block_y_end', 'test_block_z_start', 'test_block_z_end'
@@ -188,10 +187,8 @@ class Parameters():
 
         return output
 
-    
     def U(self, u_value):
         return u_value * self.switch_spacing
-
 
     def update_calculated_attributes(self):
         # Calculated attributes
@@ -199,7 +196,7 @@ class Parameters():
             self.screw_edge_x_inset = self.screw_edge_inset
         if self.screw_edge_y_inset is None:
             self.screw_edge_y_inset = self.screw_edge_inset
-        
+
         self.case_height_base_removed = self.case_height - self.bottom_cover_thickness
         self.case_height_extra_fill = self.case_height + self.case_height_extra
         self.side_margin_diff = self.right_margin - self.left_margin
@@ -207,14 +204,13 @@ class Parameters():
         self.screw_tap_hole_diameter = self.screw_diameter - 0.35
         self.screw_hole_body_diameter = self.screw_diameter + (self.screw_hole_body_wall_width * 2)
         self.screw_hole_body_radius = self.screw_hole_body_diameter / 2
-        self.x_screw_width = self.real_case_width - ((self.screw_edge_x_inset * 2))# + self.screw_diameter)
-        self.y_screw_width = self.real_case_height - ((self.screw_edge_y_inset * 2))# + self.screw_diameter)
+        self.x_screw_width = self.real_case_width - ((self.screw_edge_x_inset * 2))  # + self.screw_diameter)
+        self.y_screw_width = self.real_case_height - ((self.screw_edge_y_inset * 2))  # + self.screw_diameter)
         self.bottom_section_count = math.ceil(self.real_case_width / self.x_build_size)
-        self.screw_hole_body_support_end_x = (self.case_height_extra_fill / self.screw_hole_body_support_x_factor) + self.screw_hole_body_radius
-
+        self.screw_hole_body_support_end_x = (
+                                                         self.case_height_extra_fill / self.screw_hole_body_support_x_factor) + self.screw_hole_body_radius
 
     def set_dimensions(self, max_x, min_y, min_x, max_y):
-        
 
         self.max_x = max_x
         self.max_x = max_x
@@ -232,7 +228,8 @@ class Parameters():
         if self.custom_screw_hole_coordinates is not None:
             self.screw_edge_x_inset = 0
             self.screw_edge_y_inset = 0
-            self.logger.debug('Custom Screw Default: screw_edge_x_inset: %f, screw_edge_y_inset: %f', self.screw_edge_x_inset, self.screw_edge_y_inset)
+            self.logger.debug('Custom Screw Default: screw_edge_x_inset: %f, screw_edge_y_inset: %f',
+                              self.screw_edge_x_inset, self.screw_edge_y_inset)
 
         if self.custom_pcb == True:
             half_u = self.U(1) / 2
@@ -243,11 +240,11 @@ class Parameters():
             if self.pcb_top_left_coordinates is not None:
                 pcb_x_coordinate = self.pcb_top_left_coordinates[0]
                 pcb_y_coordinate = self.pcb_top_left_coordinates[1]
-            
+
             # Get the x any y coordinates of the top reference switch and left reference switch
             left_switch_left_x_coordinate = self.pcb_left_switch_center_x_coordinate - half_u
             top_switch_top_y_coordinate = self.pcb_top_switch_center_y_coordinate - half_u
-            
+
             # Get the margin built into the left and top of the PCB
             pcb_left_margin = left_switch_left_x_coordinate - pcb_x_coordinate
             pcb_top_margin = top_switch_top_y_coordinate - pcb_y_coordinate
@@ -269,14 +266,12 @@ class Parameters():
 
                 self.screw_edge_x_inset = self.case_wall_thickness + self.pcb_case_left_margin + screw_hole_pcb_origin_x_offset
                 self.screw_edge_y_inset = self.case_wall_thickness + self.pcb_case_bottom_margin + screw_hole_pcb_origin_y_offset
-                self.logger.debug('PCB settings: screw_edge_x_inset: %f, screw_edge_y_inset: %f', self.screw_edge_x_inset, self.screw_edge_y_inset)
-
+                self.logger.debug('PCB settings: screw_edge_x_inset: %f, screw_edge_y_inset: %f',
+                                  self.screw_edge_x_inset, self.screw_edge_y_inset)
 
         self.logger.debug('real_max_x: %d, real_max_y: %s', self.real_max_x, self.real_max_y)
 
         self.update_calculated_attributes()
-
-
 
     def build_attr_from_dict(self, parameter_dict):
 
@@ -297,35 +292,33 @@ class Parameters():
             if param == 'custom_switch':
                 if 'points' not in value.keys():
                     raise AttributeError('A set of "points" must exist in the "custom_switch" to use a custom switch')
-                
+
                 self.custom_shape_points = value['points']
 
                 if 'path' in value.keys():
                     self.custom_shape_path = value['path']
                 else:
-                    self.logger.warning('Custom Switch defined but no "path" list defined. Points in "ponts" list will be used in defined order')
-                
+                    self.logger.warning(
+                        'Custom Switch defined but no "path" list defined. Points in "points" list will be used in defined order')
+
                 self.custom_shape = True
-                
 
             if ignore_deprecated == False:
                 setattr(self, param, value)
 
-            
-
-
-        self.switch_config = SwitchConfig(kerf = self.kerf, switch_type = self.switch_type, stabilizer_type = self.stabilizer_type, custom_shape = self.custom_shape, custom_shape_points = self.custom_shape_points, custom_shape_path = self.custom_shape_path)
+        self.switch_config = SwitchConfig(kerf=self.kerf, switch_type=self.switch_type,
+                                          stabilizer_type=self.stabilizer_type, custom_shape=self.custom_shape,
+                                          custom_shape_points=self.custom_shape_points,
+                                          custom_shape_path=self.custom_shape_path)
 
         self.update_calculated_attributes()
 
         self.validate_parameters()
-    
-    
+
     def set_parameter_dict(self, parameter_dict):
         self.parameter_dict = parameter_dict
         self.build_attr_from_dict(self.parameter_dict)
-    
-    
+
     # def get_param(self, paramaeter_name):
 
     #     if self.parameter_dict is not None and paramaeter_name in self.parameter_dict.keys():
@@ -335,23 +328,21 @@ class Parameters():
     #     else:
     #         raise ValueError('No paramter exists with name %s' % (paramaeter_name))
 
-
-
     def validate_parameters(self):
         parameter_error = False
         error_message = ''
         # if self.screw_edge_inset < self.case_wall_thickness + self.screw_hole_body_radius:
         #     parameter_error = True
         #     error_message += 'Screw Edge Inset %f must be greater than case_wall_thickness: %f + screw_hole_body_radius: %f = %f\n' % (self.screw_edge_inset, self.case_wall_thickness, self.screw_hole_body_radius, self.case_wall_thickness + self.screw_hole_body_radius)
-        
-        if self.screw_count > 0 :
+
+        if self.screw_count > 0:
             if self.screw_count < 4:
                 parameter_error = True
                 error_message += 'Screw count must be at least 4\n'
             if self.screw_count % 2 != 0:
                 parameter_error = True
-                error_message +=  'Screw count must be even\n'
-            
+                error_message += 'Screw count must be even\n'
+
         if self.switch_type not in self.switch_config.switch_type_function_dict.keys():
             parameter_error = True
             error_message += 'switch type %s is not a valid switch type' % (self.switch_type)
@@ -363,4 +354,3 @@ class Parameters():
         if parameter_error == True:
             print('ERROR:', error_message)
             exit(1)
-
