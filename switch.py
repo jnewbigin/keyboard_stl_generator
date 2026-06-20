@@ -157,7 +157,7 @@ class Switch(Cell):
     def __repr__(self):
         global_neighbors_json = self.neighbors_formatted(self.global_neighbors, indent=4, current_indent=10)
         local_neighbors_json = self.neighbors_formatted(self.local_neighbors, indent=4, current_indent=10)
-        return 'Switch: ' + super().__str__() + '\nglobal neighbors: \n' + global_neighbors_json + '\local neighbors: \n' + local_neighbors_json
+        return 'Switch: ' + super().__str__() + '\nglobal neighbors: \n' + global_neighbors_json + '\nlocal neighbors: \n' + local_neighbors_json
 
 
     def switch_cutout(self):
@@ -178,12 +178,18 @@ class Switch(Cell):
         switch_poly_points = self.switch_config.get_switch_poly_info()
         switch_poly_path = [range(len(switch_poly_points))]
 
-        stab_poly_points, support_cutout_poly_points = self.switch_config.get_stab_poly_info(key_width = self.switch_length)
+        stab_poly_points, *support_cutout_poly_points = self.switch_config.get_stab_poly_info(key_width = self.switch_length)
+
+        if len(support_cutout_poly_points) == 2:
+            advanced_poly_points = support_cutout_poly_points[1]
+        else:
+            advanced_poly_points = []
+        support_cutout_poly_points = support_cutout_poly_points[0]
         
         
         self.logger.debug('\tswitch_poly_points: %d, switch_poly_path: %d', len(switch_poly_points), len(switch_poly_path))
 
-        # Create swtch cutout polygon
+        # Create switch cutout polygon
         cutout_polygon = polygon(switch_poly_points, switch_poly_path)
 
         # Create stab polygon if it is defined
@@ -204,6 +210,42 @@ class Switch(Cell):
             cutout += down( (10 / 2) + (self.parameters.plate_thickness / 2) ) (
                 linear_extrude(height = 10, center = True)(support_cutout)
             )
+
+        # advanced poly points
+        # multiple polygons
+        # cutout
+        # support_cutout
+        # support_infill
+        for advanced in advanced_poly_points:
+            action, poly_points = advanced
+            poly_path = [range(len(switch_poly_points))]
+            advanced_polygon = polygon(poly_points, poly_path)
+
+            if action == 'cutout':
+                cutout += linear_extrude(height = 10, center = True)(advanced_polygon)
+            elif action == 'stab_cutout':
+                # stab cutout it mirrored to each side of the switch
+                support_cutout = advanced_polygon + mirror([1, 0, 0]) ( advanced_polygon )
+                cutout += linear_extrude(height = 10, center = True)(support_cutout)
+            elif action == 'support_cutout':
+                # support cutout it mirrored to each side of the switch
+                support_cutout = advanced_polygon + mirror([1, 0, 0]) ( advanced_polygon )
+
+                # and then extrude down to remove supports
+                cutout += down( (10 / 2) + (self.parameters.plate_thickness / 2) ) (
+                    linear_extrude(height = 10, center = True)(support_cutout)
+                )
+            elif action == 'support_infill':
+                # support cutout it mirrored to each side of the switch
+                support_cutout = advanced_polygon + mirror([1, 0, 0]) ( advanced_polygon )
+
+                # and then extrude down to remove supports
+                infill = down( (10 / 2) + (self.parameters.plate_thickness / 2) ) (
+                    linear_extrude(height = 10, center = True)(support_cutout)
+                )
+            else:
+                raise ValueError("Unknown action: " + action)
+
 
         cutout = rotate(a = 180, v = (0, 0, 1)) ( cutout )
 

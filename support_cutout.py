@@ -26,9 +26,15 @@ class SupportCutout(Cell):
     def __str__(self):
         return 'SupportCutout: ' + super().__str__()
 
-    def support_cutout(self):    
-        d = down(self.support_bar_height / 2) ( cube([self.w_mm, self.h_mm, self.support_bar_height + self.plate_thickness], center = True) )
-    
+    def support_cutout(self):
+        # Adjacent support cutouts tile the whole plate edge-to-edge and the
+        # cutout top sits flush with the plate bottom. Both produce coplanar
+        # coincident faces that leave the unioned/subtracted mesh non-manifold.
+        # Grow the cube by epsilon in every direction so neighbours overlap and
+        # the cut pokes through the plate bottom instead of ending flush.
+        eps = 0.01
+        d = down(self.support_bar_height / 2) ( cube([self.w_mm + eps, self.h_mm + eps, self.support_bar_height + self.plate_thickness + eps], center = True) )
+
         d = right(self.w_mm / 2) ( back(self.h_mm / 2) ( d ) )
 
         return d # right(u(w / 2)) ( back(u(h / 2)) ( d ) )

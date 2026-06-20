@@ -63,7 +63,7 @@ class ShapeCutout(Cell):
     def __repr__(self):
         global_neighbors_json = self.neighbors_formatted(self.global_neighbors, indent=4, current_indent=10)
         local_neighbors_json = self.neighbors_formatted(self.local_neighbors, indent=4, current_indent=10)
-        return 'Switch: ' + super().__str__() + '\nglobal neighbors: \n' + global_neighbors_json + '\local neighbors: \n' + local_neighbors_json
+        return 'Switch: ' + super().__str__() + '\nglobal neighbors: \n' + global_neighbors_json + '\nlocal neighbors: \n' + local_neighbors_json
 
 
     def get_shape_cutout(self):

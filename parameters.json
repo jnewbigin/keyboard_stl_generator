@@ -1,34 +1,40 @@
 {
-    "x_build_size" : 200,
-    "y_build_size" : 200,
+    "x_build_size" : 150,
+    "y_build_size" : 150,
 
-    "kerf" : 0.01,
+    "kerf" : 0.23,
 
-    "switch_type": "mx_openable",
-    "stabilizer_type": "cherry_costar",
+    "switch_type": "mx",
+    "xcustom_switch": {
+        "points": [
+            [8, 8],
+            [7, -7],
+            [-7, -7],
+            [-7, 7]
+        ],
+        "path": [0, 1, 2, 3]
+    },
+    "stabilizer_type": "custom",
 
-    "custom_shape": false, 
-    "custom_shape_points": null,
-    "custom_shape_path": null,
-    
+
     "plate_supports": true,
-    "support_bar_height" : 3.0,
+    "support_bar_height" : 5.0,
     "support_bar_width" : 3.0,    
 
-    "top_margin" : 18,
-    "bottom_margin" : 10,
-    "left_margin" : 10,
-    "right_margin" : 10,
+    "top_margin" : 5,
+    "bottom_margin" : 5,
+    "left_margin" : 5,
+    "right_margin" : 5,
 
     "case_height" : 18,
     "case_wall_thickness" : 3.0,
-    "plate_thickness" : 1.111,
+    "plate_thickness" : 1.9,
     "plate_corner_radius" : 4,
     "bottom_cover_thickness": 2,
 
-    "tilt": 2,
+    "tilt": 0,
 
-    "screw_count": 4,
+    "screw_count": 0,
     "screw_diameter": 4,
     "screw_edge_inset": 7,
 
