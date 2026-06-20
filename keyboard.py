@@ -179,7 +179,7 @@ class Keyboard():
                     self.custom_polygon_collection.add_item(x, y, custom_shape)
 
 
-    def get_assembly(self, top = False, bottom = False, all = True, plate_only = False):
+    def get_assembly(self, top = False, bottom = False, all = True, plate_only = False, case_bottom = False):
         
         
         # Init top_assembly and bottom_assembly objects
@@ -238,9 +238,9 @@ class Keyboard():
         pcb_model = self.pcb.get_model()
 
         # Add case to top_assembly
-        top_assembly += self.body.case(plate_only = plate_only)
+        top_assembly += self.body.case(plate_only = plate_only, walls_only = case_bottom)
 
-        if self.parameters.simple_test == False:
+        if self.parameters.simple_test == False and case_bottom == False:
             # Remove switch suport cutouts
             top_assembly -= self.switch_support_cutouts
 
@@ -253,7 +253,7 @@ class Keyboard():
         screw_hole_body_collection = None
         screw_hole_body_scaled_collection = None
         if self.parameters.screw_count > 0:
-            screw_hole_collection, screw_hole_body_collection, screw_hole_body_scaled_collection = self.body.screw_hole_objects(tap = bottom)
+            screw_hole_collection, screw_hole_body_collection, screw_hole_body_scaled_collection = self.body.screw_hole_objects(tap = bottom or case_bottom)
 
             # Remove screw holes from top top_assembly
             top_assembly -= screw_hole_collection
@@ -389,8 +389,13 @@ class Keyboard():
                 screw_hole_body_scaled_collection = rotate(self.parameters.tilt, [1, 0, 0]) ( screw_hole_body_scaled_collection )
             body_block = rotate(self.parameters.tilt, [1, 0, 0]) ( body_block )
 
-        # Remove bottom block to make bottom of case flat
-        top_assembly -= bottom_diff_plate
+        # Remove bottom block to make bottom of case flat. For a fused walls+bottom
+        # shell the walls must reach down to the bottom cover so the two overlap and
+        # join into a single solid instead of merely touching at z = 0.
+        if case_bottom == True:
+            top_assembly -= down(self.parameters.bottom_cover_thickness) ( bottom_diff_plate )
+        else:
+            top_assembly -= bottom_diff_plate
         bottom_assembly -= down(self.parameters.bottom_cover_thickness) ( bottom_diff_plate )
 
 
@@ -435,7 +440,11 @@ class Keyboard():
             else:
                 return top_assembly
         elif bottom == True:
-            return bottom_assembly 
+            return bottom_assembly
+        elif case_bottom == True:
+            # Case walls fused with the bottom cover, no plate (tray-mount shell)
+            top_assembly += bottom_assembly
+            return top_assembly
         else:
             top_assembly += bottom_assembly
             return top_assembly
@@ -470,6 +479,12 @@ class Keyboard():
         y_per_part = math.floor(min_y / y_parts)
         self.logger.debug('x_per_part: %d, y_per_part: %d', x_per_part, y_per_part)
 
+        # Split on the even per-part width rather than the raw build size. Packing
+        # greedily up to x_build_size made the first sections as wide as the build
+        # plate allows and left a thin remainder section; dividing max_x into
+        # x_parts equal pieces (each guaranteed <= build_x) keeps them balanced.
+        x_per_part_size = x_per_part * self.parameters.switch_spacing
+
         # Union all standard switch cutouts together
         current_x_start = 0.0
         # current_y_start = 0.0
@@ -497,12 +512,12 @@ class Keyboard():
                 # switch_y_max = current_switch.y_end_mm + self.parameters.top_margin
                 # switch_y_min = current_switch.y_start_mm + self.parameters.top_margin
 
-                if switch_x_max - current_x_start < self.parameters.x_build_size:
+                if switch_x_max - current_x_start < x_per_part_size:
                     # self.logger.debug('current_x_section:', current_x_section)
                     self.switch_section_list[current_x_section].add_item(x, y, current_switch)
                     self.support_section_list[current_x_section].add_item(x, y, current_support)
                     self.support_cutout_section_list[current_x_section].add_item(x, y, current_support_cutout)
-                elif switch_x_max - current_x_start > self.parameters.x_build_size and next_x_section > current_x_section:
+                elif switch_x_max - current_x_start > x_per_part_size and next_x_section > current_x_section:
                     self.switch_section_list[next_x_section].add_item(x, y, current_switch)
                     self.support_section_list[next_x_section].add_item(x, y, current_support)
                     self.support_cutout_section_list[next_x_section].add_item(x, y, current_support_cutout)
@@ -532,185 +547,143 @@ class Keyboard():
             section.set_collection_neighbors()
 
     def get_top_section_remove_block(self, section_number):
-        this_function_name = sys._getframe(  ).f_code.co_name
-        
         section = self.switch_section_list[section_number]
 
         self.logger.debug('Get Section %d', section_number)
 
         (min_x, max_x, max_y, min_y) = section.get_collection_bounds()
-
-        min_x_mm = self.parameters.U(min_x)
-        max_x_mm = self.parameters.U(max_x)
-        max_y_mm = self.parameters.U(max_y)
-        min_y_mm = self.parameters.U(min_y)
-        
-        # (case_min_x, case_max_x, case_max_y, case_min_y) = section.get_collection_bounds()
-
         self.logger.debug('Section Bounds: min_x: %f, max_x: %f, max_y: %f, min_y: %f', min_x, max_x, max_y, min_y)
-
-        include_right_border = False
-        include_left_border = False
-        # include_top_border = False
-        # include_bottom_border = False
-
-        if max_x == self.parameters.max_x:
-            include_right_border = True
-
-        if min_x == self.parameters.min_x:
-            include_left_border = True
-        
-        # if max_y == self.parameters.max_y:
-        #     include_top_border = True
-        
-        # if min_y == self.parameters.min_y:
-        #     include_bottom_border = True
-        #     if abs(min_y) < self.build_y:
-        #         include_top_border = True
-
-        remove_block = union()
 
         remove_block_height = self.parameters.case_height_base_removed * 4
         remove_block_z_offset = remove_block_height / 2
         remove_block_length = self.parameters.real_max_x
-        
-        section_has_right_global_neighbor = section.has_global_right_neighbor_section()
+
         section_has_left_global_neighbor = section.has_global_left_neighbor_section()
 
-        # Draw non border edges
+        # Carve the section out of the plate by clipping every elementary y-band
+        # (key rows, empty spacer rows, rows this section owns no keys in, and the
+        # top/bottom margins) down to the section's x-extent. The per-band
+        # staircase and interlock-seam logic lives in get_section_x_clip.
+        return self.get_section_x_clip(
+            section, min_x, max_x, section_has_left_global_neighbor,
+            remove_block_length, remove_block_height, remove_block_z_offset)
+
+    def section_key_seam_bands(self, section, min_x, max_x, section_has_left_global_neighbor, remove_block_length):
+        # For every key in the section return its y-band and the x at which the
+        # section's kept plate ends on the right and starts on the left (the
+        # interlock seam positions used by get_section_x_clip).
+        #
+        # The interlock seam normally sits halfway to the neighbouring section's
+        # key. Across a large empty region that midpoint is far away and would
+        # push the section past the build size, so the overhang into a gap is
+        # capped to a small interlock tab. The unowned middle of a big gap is
+        # then left without plate, which is the intended result for sparse
+        # layouts. (max_seam_overhang replaces the original min(..., max_x) cap,
+        # where max_x was a cell count and U(max_x) a meaningless distance.)
+        max_seam_overhang = 0.5
+        bands = []
         for rx in section.get_rx_list():
             for ry in section.get_ry_list_in_rx(rx):
                 for x in section.get_x_list_in_rx_ry(rx, ry):
                     for y in section.get_y_list_in_rx_ry_x(x, rx, ry):
-                        item: Switch
-                        item = section.get_item(x, y)
+                        item: Switch = section.get_item(x, y)
 
-                        # base separator bar height
-                        bar_height = self.parameters.U(item.h) + (self.kerf * 2)
-                        y_offset = self.parameters.U(item.y - item.h) - self.kerf
-                        right_x_offset = 0.0
-                        self.logger.debug('right_x_offset: %f', right_x_offset)
-                        left_x_offset = 0.0
+                        right_keep = self.parameters.U(item.x + item.w)
+                        if item.has_neighbor('right', 'global') == True:
+                            neighbor_offset = item.get_neighbor_offset('right', 'global')
+                            right_keep += self.parameters.U(min([neighbor_offset / 2, max_seam_overhang]))
+                        else:
+                            right_keep += self.parameters.U(min([max_x - item.end_x, max_seam_overhang]))
 
-                        # if switch has a local top neighbor include any offset between this and that key in separator bar
-                        if item.has_neighbor('top') == True:
-                            offset = self.parameters.U(item.get_neighbor_offset('top'))
-                            # self.logger.debug('%s, Local Top Bar True, offset: %f', str(item), offset)
-                            bar_height += offset
-                        
-                        # If switch has no global top neighbor include the board edge in this separator bar
-                        if item.has_neighbor('top', 'global') == False:
-                            # self.logger.debug('%s, Global Top Bar False', str(item))
-                            bar_height += self.parameters.U(abs(item.y)) + self.parameters.top_margin + self.parameters.support_bar_width
-                            # y_offset += self.parameters.support_bar_width
-                            # self.logger.debug('\t bar_height: %f', bar_height)
-
-                        # If switch has no global bottom neighbor include the board edge in this separator bar
-                        if item.has_neighbor('bottom', 'global') == False:
-                            # self.logger.debug('%s, Global Bottom Bar False', str(item))
-                            bar_height += self.parameters.U( abs(self.parameters.min_y) - (abs(item.y) + item.h) ) + self.parameters.bottom_margin + self.parameters.support_bar_width
-                            # self.logger.debug('\t bar_height: %f', bar_height)
-                            y_offset -= (self.parameters.bottom_margin + self.parameters.U( abs(self.parameters.min_y) - (abs(item.y) + item.h) ) ) + self.parameters.support_bar_width
-
-                            # if item.has_neighbor('right') == True:
-                                # perp_offset = item.get_neighbor_perp_offset('right')
-                                # if perp_offset > 0.0:
-                                #     self.logger.debug('Switch: %s, perp_offset: %f', str(item), perp_offset)
-
-                        
-                        # If switch has no global right neighbor and 
-                        if item.has_neighbor('right', 'global') == False and item.end_x == max_x:
-                            self.logger.debug('Switch %s, No global right neighbor. item.end_x == max_x (%d == %d)', str(item), item.end_x, max_x)
-                            neighbor = None
-                            neighbor_offset = 0.0
-
-                            # Switch has local top neighbor
-                            if item.has_neighbor('top') == True:
-                                neighbor = item.get_neighbor('top')
-                                # self.logger.debug('Switch: %s, top neighbor: %s', str(item), str(neighbor))
-                                offset = neighbor.get_neighbor_offset('right', 'global')
-                                if offset > neighbor_offset:
-                                    neighbor_offset = offset
-
-                            # Switch has local bottom neighbor
-                            if item.has_neighbor('bottom') == True:
-                                neighbor = item.get_neighbor('bottom')
-                                # self.logger.debug('Switch: %s, bottom neighbor: %s', str(item), str(neighbor))
-                                offset = neighbor.get_neighbor_offset('right', 'global')
-                                if offset > neighbor_offset:
-                                    neighbor_offset = offset
-
-                            # self.logger.debug('Switch: %s, neighbor_offset: %f', str(item), neighbor_offset)
-
+                        left_keep = remove_block_length
+                        if item.has_neighbor('left', 'global') == True:
+                            left_keep = self.parameters.U(item.x)
+                            neighbor_offset = item.get_neighbor_offset('left', 'global')
                             if neighbor_offset > 0.0:
-                                right_x_offset += self.parameters.U(neighbor_offset) / 2
-                                self.logger.debug('right_x_offset: %f', right_x_offset)
-                                # self.logger.debug('1: switch %s, right_x_offset %f', str(item), right_x_offset)
+                                left_keep -= self.parameters.U(min([neighbor_offset / 2, max_seam_overhang]))
+                        elif section_has_left_global_neighbor == True:
+                            left_keep = self.parameters.U(min_x)
 
-                        
-                        # if include_right_border == False:
-                        if item.has_neighbor('right') == False:
-                            # self.logger.debug('switch %s, has right neighbor %s', str(item), str(item.has_neighbor('right')))
-                            right_x_offset += self.parameters.U(item.x + item.w)
-                            self.logger.debug('right_x_offset: %f', right_x_offset)
-                            
-                            # Switch has global right neighbor
-                            if item.has_neighbor('right', 'global') == True:
-                                # Get Global roght neightbor offset
-                                # Set right_x_offset to minimum value of half neighbor offset or the maximum x for the setion
-                                neighbor_offset = item.get_neighbor_offset('right', 'global')
-                                right_x_offset += self.parameters.U(min([neighbor_offset / 2, max_x]))
-                                self.logger.debug('right_x_offset: %f', right_x_offset)
-                                # self.logger.debug('\t\tglobal right neighbor offset: %f, right_x_offset: %f', neighbor_offset, right_x_offset - self.parameters.U(item.x + item.w))
-                            else:
-                                # Set right_x_offset to maximum x for the setion minus the end x coordinate of the switch
-                                right_x_offset += self.parameters.U(max_x - item.end_x)
-                                self.logger.debug('right_x_offset: %f', right_x_offset)
+                        bands.append({
+                            'y_lo': item.y - item.h,
+                            'y_hi': item.y,
+                            'right_keep': right_keep,
+                            'left_keep': left_keep,
+                        })
+        return bands
 
-                            
-                            if include_right_border == False:
-                                remove_block += down(remove_block_z_offset) ( right(right_x_offset) ( forward(y_offset) ( cube([remove_block_length, bar_height, remove_block_height]) ) ) )
-                        
-                        # If switch has no local left neighbor
-                        if item.has_neighbor('left') == False:
-                            # self.logger.debug('2: switch %s, left_x_offset %f', str(item), left_x_offset)
-                            # self.logger.debug('switch %s, has left neighbor %s', str(item), str(item.has_neighbor('left')))
-                            # self.logger.debug('remove_block_length: %f, item.x: %f, self.parameters.U(item.x): %f, -(remove_block_length) + self.parameters.U(item.x): %f', remove_block_length, item.x, self.parameters.U(item.x), -(remove_block_length) + self.parameters.U(item.x))
-                            # if switch has no global left neighbor
-                            if item.has_neighbor('left', 'global') == False:
-                                if section_has_left_global_neighbor == True:
-                                    left_x_offset += -(remove_block_length) + self.parameters.U(min_x)
-                            
-                            
-                            
-                            # self.logger.debug('3: switch %s, left_x_offset %f', str(item), left_x_offset)
+    def get_section_x_clip(self, section, min_x, max_x, section_has_left_global_neighbor, remove_block_length, remove_block_height, remove_block_z_offset):
+        clip = union()
 
-                            if item.has_neighbor('left', 'global') == True:
-                                left_x_offset += -(remove_block_length) + self.parameters.U(item.x)
-                                neighbor_offset = item.get_neighbor_offset('left', 'global')
-                                # self.logger.debug('\t\tglobal left neighbor offset: %f, left_x_offset: %f', neighbor_offset, left_x_offset)
-                                if neighbor_offset > 0.0:
-                                    left_x_offset -= self.parameters.U(neighbor_offset) / 2
-                                    # self.logger.debug('\t\tglobal left neighbor offset: %f, left_x_offset: %f', neighbor_offset, left_x_offset)
+        bands = self.section_key_seam_bands(section, min_x, max_x, section_has_left_global_neighbor, remove_block_length)
+        if len(bands) == 0:
+            return clip
 
-                            if include_left_border == False:
-                                # self.logger.debug('4: switch %s, left_x_offset %f', str(item), left_x_offset)
-                                remove_block += down(remove_block_z_offset) ( right(left_x_offset) ( forward(y_offset) ( cube([remove_block_length, bar_height, remove_block_height]) ) ) )
-                                # remove_block += down(self.support_bar_height * 3) ( right(left_x_offset) ( forward(self.parameters.U(item.y - item.h) ) ( cube([self.support_bar_width / 2, bar_height, self.support_bar_height * 10]) ) ) )
-                        
-                        # if include_top_border == False:
-                        #     self.logger.debug('switch %s, has top neighbor %s', str(item), str(item.has_neighbor('top')))
-                        #     if item.has_neighbor('top') == False:
-                        #         self.logger.debug('\tno top neighbor')
-                        #         top_switch_edge += down(self.support_bar_height * 3) ( right(self.parameters.U(item.x + item.w)) ( forward(self.parameters.U(item.y - item.h) ) ( cube([self.support_bar_width / 2, self.parameters.U(item.h), self.support_bar_height * 10]) ) ) )
-                        
-                        # if include_bottom_border == False:
-                        #     self.logger.debug('switch %s, has bottom neighbor %s', str(item), str(item.has_neighbor('bottom')))
-                        #     if item.has_neighbor('bottom') == False:
-                        #         self.logger.debug('\tno bottom neighbor')
-                        #         bottom_switch_edge += down(self.support_bar_height * 3) ( right(self.parameters.U(item.x + item.w)) ( forward(self.parameters.U(item.y - item.h) ) ( cube([self.support_bar_width / 2, self.parameters.U(item.h), self.support_bar_height * 10]) ) ) )
+        # Sweep the full board height (plus margins) and clip every elementary
+        # y-band, so key rows, empty spacer rows and the top/bottom margins are
+        # all clipped to the section's x-extent. A section may own no keys in
+        # some rows (e.g. the bottom row) yet its plate still spans the whole
+        # board, which is what left the "extra long" full-width strips.
+        (board_min_x, board_max_x, board_max_y, board_min_y) = self.switch_collection.get_collection_bounds()
 
-        return remove_block
+        # The board's own left/right edge must be kept, not clipped. (Derive this
+        # from the real board bounds; self.parameters.min_x / max_x are unset.)
+        include_left_border = (min_x == board_min_x)
+        include_right_border = (max_x == board_max_x)
+
+        top_margin_cells = (self.parameters.top_margin / self.parameters.switch_spacing) + 1
+        bottom_margin_cells = (self.parameters.bottom_margin / self.parameters.switch_spacing) + 1
+        sweep_lo = board_min_y - bottom_margin_cells
+        sweep_hi = board_max_y + top_margin_cells
+
+        key_y_lo = min(b['y_lo'] for b in bands)
+        key_y_hi = max(b['y_hi'] for b in bands)
+        overall_right = max(b['right_keep'] for b in bands)
+        overall_left = min(b['left_keep'] for b in bands)
+
+        edges = set([sweep_lo, sweep_hi])
+        for b in bands:
+            if sweep_lo < b['y_lo'] < sweep_hi:
+                edges.add(b['y_lo'])
+            if sweep_lo < b['y_hi'] < sweep_hi:
+                edges.add(b['y_hi'])
+        edges = sorted(edges)
+
+        for lo, hi in zip(edges, edges[1:]):
+            if hi - lo < 1e-9:
+                continue
+            mid = (lo + hi) / 2.0
+
+            # right_keep is the rightmost seam among the keys covering this band,
+            # so no key is ever removed.
+            covering = [b for b in bands if b['y_lo'] - 1e-9 <= mid <= b['y_hi'] + 1e-9]
+            if len(covering) > 0:
+                right_keep = max(b['right_keep'] for b in covering)
+                left_keep = min(b['left_keep'] for b in covering)
+            elif mid < key_y_lo or mid > key_y_hi:
+                # Top / bottom margin: clip to the section's overall extent so the
+                # corners never leave an unclipped strip.
+                right_keep = overall_right
+                left_keep = overall_left
+            else:
+                # Interior spacer row: continue the staircase from the nearest
+                # key band (below preferred, then above).
+                below = [b for b in bands if b['y_hi'] <= lo + 1e-9]
+                above = [b for b in bands if b['y_lo'] >= hi - 1e-9]
+                source = below if len(below) > 0 else above
+                right_keep = max(b['right_keep'] for b in source)
+                left_keep = min(b['left_keep'] for b in source)
+
+            y_offset = self.parameters.U(lo) - self.kerf
+            bar_height = self.parameters.U(hi - lo) + (self.kerf * 2)
+
+            if include_right_border == False:
+                clip += down(remove_block_z_offset) ( right(right_keep) ( forward(y_offset) ( cube([remove_block_length, bar_height, remove_block_height]) ) ) )
+
+            if include_left_border == False:
+                clip += down(remove_block_z_offset) ( right(left_keep - remove_block_length) ( forward(y_offset) ( cube([remove_block_length, bar_height, remove_block_height]) ) ) )
+
+        return clip
 
     
     def get_bottom_section_remove_block(self, section_number):

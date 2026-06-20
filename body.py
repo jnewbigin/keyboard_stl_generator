@@ -301,7 +301,7 @@ class Body():
         # Return the case wall object
         return case_wall
 
-    def case(self, body_block_only = False, plate_only = False):
+    def case(self, body_block_only = False, plate_only = False, walls_only = False):
         # Get the margins for the plate without the ammount that the minkowski will add
         pre_minkowski_x_margin = ((self.right_margin + self.left_margin) / 2 - self.plate_corner_radius)
         pre_minkowski_y_margin = ((self.top_margin + self.bottom_margin) / 2 - self.plate_corner_radius)
@@ -317,12 +317,16 @@ class Body():
         round_corner = cylinder(r = self.plate_corner_radius, h = pre_minkowski_thickness, center = True)
         square_corner = cube([self.plate_corner_radius * 2, self.plate_corner_radius * 2, pre_minkowski_thickness], center = True)
 
-        # Create Plate object. Add it to function return case object
-        case_object = self.plate(case_x, case_y, pre_minkowski_thickness, round_corner)
+        if walls_only == True:
+            # Build only the case walls, with no plate
+            case_object = self.case_border(case_x, case_y, round_corner, square_corner)
+        else:
+            # Create Plate object. Add it to function return case object
+            case_object = self.plate(case_x, case_y, pre_minkowski_thickness, round_corner)
 
-        # If not only making the plate add the case border to the case object
-        if plate_only == False:
-            case_object += self.case_border(case_x, case_y, round_corner, square_corner)
+            # If not only making the plate add the case border to the case object
+            if plate_only == False:
+                case_object += self.case_border(case_x, case_y, round_corner, square_corner)
 
         # move case_object to line up with board
         case_object = case_object

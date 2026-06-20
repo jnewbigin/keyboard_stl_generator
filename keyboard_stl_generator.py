@@ -3,6 +3,7 @@
 import argparse
 from asyncio import subprocess
 import json
+import json5
 # import math
 import re
 import logging
@@ -207,7 +208,10 @@ def main():
        
         logger.debug('Parse parameter JSON string')
         try:
-            parameter_dict = json.loads(parameter_file_text)
+            # Parse with json5 so the parameter file may contain // and /* */
+            # comments and trailing commas. json5 is a strict superset of JSON,
+            # so plain JSON parameter files keep working unchanged.
+            parameter_dict = json5.loads(parameter_file_text)
             logger.debug('Valid Json Parsed')
         except:
             logger.error('Failed to parse parameter JSON file.')
@@ -249,6 +253,7 @@ def main():
             # If there is a bottom section for the current section add it to section dict
             if section < keyboard.get_bottom_section_count():
                 solid_object_dict[section]['bottom'] = keyboard.get_assembly(bottom = True)
+                solid_object_dict[section]['case_bottom'] = keyboard.get_assembly(case_bottom = True)
             
     # Create exploded object
     elif args.exploded == True:
@@ -256,12 +261,14 @@ def main():
         solid_object_dict[-1]['top'] = union()
         solid_object_dict[-1]['plate'] = union()
         solid_object_dict[-1]['bottom'] = union()
+        solid_object_dict[-1]['case_bottom'] = union()
         for section in range(keyboard.get_top_section_count()):
             keyboard.set_section(section)
             solid_object_dict[-1]['top'] += up(5 * section) ( right(10 * section) ( keyboard.get_assembly(top = True) ) )
             solid_object_dict[-1]['plate'] += up(5 * section) ( right(10 * section) ( keyboard.get_assembly(plate_only = True) ) )
             if section < keyboard.get_bottom_section_count():
                 solid_object_dict[-1]['bottom'] += up(5 * section) ( right(10 * section) ( keyboard.get_assembly(bottom = True) ) )
+                solid_object_dict[-1]['case_bottom'] += up(5 * section) ( right(10 * section) ( keyboard.get_assembly(case_bottom = True) ) )
     
 
     # Create objects for a specified section
@@ -280,6 +287,7 @@ def main():
         # If there is a bottom section for the current section add it to section dict
         if args.section < keyboard.get_bottom_section_count():
             solid_object_dict[args.section]['bottom'] = keyboard.get_assembly(bottom = True)
+            solid_object_dict[args.section]['case_bottom'] = keyboard.get_assembly(case_bottom = True)
 
     # Create an objects that are not split into sections. No other options were specified
     else:
@@ -289,6 +297,7 @@ def main():
         solid_object_dict['all']['bottom'] = keyboard.get_assembly(bottom = True)
         solid_object_dict['all']['all'] = keyboard.get_assembly(all = True)
         solid_object_dict['all']['plate'] = keyboard.get_assembly(plate_only = True)
+        solid_object_dict['all']['case_bottom'] = keyboard.get_assembly(case_bottom = True)
     
     # Add global items that are not dependant on the sctions or parts of the item to build
     solid_object_dict['global'] = {}
@@ -344,8 +353,11 @@ def main():
 
             if solid_object_dict[section][part_name] is not None:
                 logger.info('Generate scad file with name %s', scad_file_name)
-                # Generate SCAD file from assembly
-                scad_render_to_file(solid_object_dict[section][part_name], scad_file_name, file_header=f'$fn = {FRAGMENTS};')
+                # Generate SCAD file from assembly. include_orig_code=False stops
+                # SolidPython from appending this script's source to the .scad file:
+                # it lands inside a /* */ block and any */ in the source breaks
+                # OpenSCAD's (non-nesting) comment parsing.
+                scad_render_to_file(solid_object_dict[section][part_name], scad_file_name, file_header=f'$fn = {FRAGMENTS};', include_orig_code=False)
                 print('Generated scad file with name', scad_file_name)
                 
                 # Render STL if option is chosen
