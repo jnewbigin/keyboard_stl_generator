@@ -30,7 +30,7 @@ class Keyboard():
 
         self.logger = logging.getLogger().getChild(__name__)
         
-        self.modifier_include_list = ['x', 'y', 'w', 'h', 'r', 'rx', 'ry', 'd']
+        self.modifier_include_list = ['x', 'y', 'w', 'h', 'r', 'rx', 'ry', 'd', 'p']
 
         self.kerf = self.parameters.kerf
 
@@ -82,6 +82,7 @@ class Keyboard():
         rotation = 0.0
         rx = 0.0
         ry = 0.0
+        z_offset = 0.0
         # r_x_offset = 0.0
         # r_y_offset = 0.0
         
@@ -100,6 +101,16 @@ class Keyboard():
                             modifier_type = key
                             
                             if modifier_type in self.modifier_include_list:
+                                if modifier_type == 'p':
+                                    # KLE profile field, repurposed as a per-switch
+                                    # plate z-offset in mm. Sticky like rotation:
+                                    # applies until changed (set to 0 to stop).
+                                    try:
+                                        z_offset = float(col[key])
+                                    except (TypeError, ValueError):
+                                        z_offset = 0.0
+                                    continue
+
                                 size = float(col[key])
                                 if modifier_type == 'w':
                                     w = size
@@ -132,9 +143,9 @@ class Keyboard():
                         x_offset = x
                         y_offset = -(y)
 
-                        switch = Switch(x_offset, y_offset, w, h, rotation = rotation, cell_value = col_escaped, switch_config = self.switch_config, parameters = self.parameters)
-                        support = Support(x_offset, y_offset, w, h, self.parameters.plate_thickness, self.parameters.support_bar_height, self.parameters.support_bar_width, rotation = rotation, parameters = self.parameters)
-                        support_cutout = SupportCutout(x_offset, y_offset, w, h, self.parameters.plate_thickness, self.parameters.support_bar_height, self.parameters.support_bar_width, rotation = rotation, parameters = self.parameters)
+                        switch = Switch(x_offset, y_offset, w, h, rotation = rotation, z_offset = z_offset, cell_value = col_escaped, switch_config = self.switch_config, parameters = self.parameters)
+                        support = Support(x_offset, y_offset, w, h, self.parameters.plate_thickness, self.parameters.support_bar_height, self.parameters.support_bar_width, rotation = rotation, z_offset = z_offset, parameters = self.parameters)
+                        support_cutout = SupportCutout(x_offset, y_offset, w, h, self.parameters.plate_thickness, self.parameters.support_bar_height, self.parameters.support_bar_width, rotation = rotation, z_offset = z_offset, parameters = self.parameters)
 
                         # Create switch cutout and support object without rotation
                         if rotation == 0.0:
