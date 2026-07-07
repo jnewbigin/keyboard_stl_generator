@@ -76,8 +76,8 @@ class Switch(Cell):
     }
 
 
-    def __init__(self, x, y, w, h, rotation = 0.0,  r_x_offset = 0.0, r_y_offset = 0.0, cell_value = '', switch_config = None, parameters: Parameters = Parameters()):
-        super().__init__(x, y, w, h, rotation,  r_x_offset, r_y_offset, cell_value = cell_value, parameters = parameters)
+    def __init__(self, x, y, w, h, rotation = 0.0,  r_x_offset = 0.0, r_y_offset = 0.0, z_offset = 0.0, cell_value = '', switch_config = None, parameters: Parameters = Parameters()):
+        super().__init__(x, y, w, h, rotation,  r_x_offset, r_y_offset, z_offset = z_offset, cell_value = cell_value, parameters = parameters)
 
         self.logger = logging.getLogger().getChild(__name__)
 
@@ -204,7 +204,13 @@ class Switch(Cell):
                 support_cutout = polygon(support_cutout_poly_points, support_cutout_poly_path) + mirror([1, 0, 0]) ( polygon(support_cutout_poly_points, support_cutout_poly_path) )
             cutout_polygon += stab
 
-        cutout = linear_extrude(height = 10, center = True)(cutout_polygon)
+        # Through-plate cutouts are a centered column. When a switch is raised
+        # (z_offset > 0) the local plate cap sits higher, so grow the column by
+        # twice the offset: after get_moved() lifts it by z_offset the top still
+        # clears the raised cap and the bottom still punches the base plate.
+        extrude_height = 10 + (2 * self.z_offset)
+
+        cutout = linear_extrude(height = extrude_height, center = True)(cutout_polygon)
 
         if support_cutout_poly_points is not None:
             cutout += down( (10 / 2) + (self.parameters.plate_thickness / 2) ) (
@@ -222,11 +228,11 @@ class Switch(Cell):
             advanced_polygon = polygon(poly_points, poly_path)
 
             if action == 'cutout':
-                cutout += linear_extrude(height = 10, center = True)(advanced_polygon)
+                cutout += linear_extrude(height = extrude_height, center = True)(advanced_polygon)
             elif action == 'stab_cutout':
                 # stab cutout it mirrored to each side of the switch
                 support_cutout = advanced_polygon + mirror([1, 0, 0]) ( advanced_polygon )
-                cutout += linear_extrude(height = 10, center = True)(support_cutout)
+                cutout += linear_extrude(height = extrude_height, center = True)(support_cutout)
             elif action == 'support_cutout':
                 # support cutout it mirrored to each side of the switch
                 support_cutout = advanced_polygon + mirror([1, 0, 0]) ( advanced_polygon )

@@ -4,6 +4,7 @@
   - [Requirements](#requirements)
   - [Usage](#usage)
   - [Parameters](#parameters)
+  - [Per-Key Options](#per-key-options)
 - [Example Output](#example-output)
   - [Output Format](#output-format)
   - [Small Layout Test](#small-layout-test)
@@ -157,6 +158,21 @@ The program can then genarate a number of different items. The entire case can b
     - **pcb_case_bottom_margin:** The space between the bottom edge of the PCB and the inside of the case wall
     - **pcb_case_right_margin:** The space between the right edge of the PCB and the inside of the case wall
     - **pcb_case_left_margin:** The space between the left edge of the PCB and the inside of the case wall
+
+## Per-Key Options
+- Some options are set per key in the layout file itself rather than in the parameters file. These use fields from the keyboard-layout-editor format.
+  - **p (raised switch height):** The keyboard-layout-editor profile field is repurposed as a per-switch plate height offset in mm. Set it to a number (as a string) to raise a switch above the rest of the plate by that many mm. The switch cutout, its plate-mounted support, and the stabilizer/support cutouts are all lifted together, and the support skirt is stretched back down so it still lands on the base plate, forming a solid raised pedestal. This is useful when some keys use taller keycaps or a different keycap row/profile and need to sit higher.
+    - Like rotation, the value is **sticky**: it applies to the key it is set on and every following key until it is changed. Set it back to `"0"` to return to the flat plate.
+    - `0` (or omitting it) renders exactly as before.
+    - **NOTE:** This does not currently work in combination with rotated keys (`r`/`rx`/`ry`).
+    - **EXAMPLE:** In this row `W` and `E` are raised 4 mm while `Q` and `R` stay flat
+      ```
+      [
+        "Q",
+        { "p": "4" }, "W", "E",
+        { "p": "0" }, "R"
+      ]
+      ```
 
 # Example Output
 ## Output Format

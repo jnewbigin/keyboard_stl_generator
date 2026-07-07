@@ -35,8 +35,8 @@ class Cell:
     # COSTAR_NOTCH_SWITCH_SIDE_X_OFFSET = 1.65
     # SIDE_NOTCH_FAR_SIDE_X_OFFSET = 4.2
 
-    def __init__(self, x: float, y: float, w: float = 1.0, h: float = 1.0, rotation = 0.0,  r_x_offset = 0.0, r_y_offset = 0.0, cell_value = '', parameters: Parameters = Parameters()):
-        
+    def __init__(self, x: float, y: float, w: float = 1.0, h: float = 1.0, rotation = 0.0,  r_x_offset = 0.0, r_y_offset = 0.0, z_offset = 0.0, cell_value = '', parameters: Parameters = Parameters()):
+
         self.logger = logging.getLogger().getChild(__name__)
 
         self.parameters = parameters
@@ -45,6 +45,8 @@ class Cell:
         self.y = y
         self.w = w
         self.h = h
+
+        self.z_offset = z_offset
 
         self.x_min = self.x
         self.x_max = self.x + self.w
@@ -112,7 +114,7 @@ class Cell:
         return self.solid
 
     def get_moved(self):
-        return right(self.x_start_mm) ( forward(self.y_start_mm) ( self.solid ) )
+        return up(self.z_offset) ( right(self.x_start_mm) ( forward(self.y_start_mm) ( self.solid ) ) )
 
     def get_start_x(self) -> float: 
         if self.rotaton == 0.0:

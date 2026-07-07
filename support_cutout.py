@@ -8,8 +8,8 @@ from parameters import Parameters
 
 class SupportCutout(Cell):
 
-    def __init__(self, x, y, w, h, plate_thickness, support_bar_height, support_bar_width, rotation = 0.0,  r_x_offset = 0.0, r_y_offset = 0.0, set_to_origin = False, cell_value = '', parameters: Parameters = Parameters()):
-        super().__init__(x, y, w, h, rotation,  r_x_offset, r_y_offset, cell_value = cell_value, parameters = parameters)
+    def __init__(self, x, y, w, h, plate_thickness, support_bar_height, support_bar_width, rotation = 0.0,  r_x_offset = 0.0, r_y_offset = 0.0, z_offset = 0.0, set_to_origin = False, cell_value = '', parameters: Parameters = Parameters()):
+        super().__init__(x, y, w, h, rotation,  r_x_offset, r_y_offset, z_offset = z_offset, cell_value = cell_value, parameters = parameters)
 
         self.logger = logging.getLogger().getChild(__name__)
 
@@ -33,7 +33,11 @@ class SupportCutout(Cell):
         # Grow the cube by epsilon in every direction so neighbours overlap and
         # the cut pokes through the plate bottom instead of ending flush.
         eps = 0.01
-        d = down(self.support_bar_height / 2) ( cube([self.w_mm + eps, self.h_mm + eps, self.support_bar_height + self.plate_thickness + eps], center = True) )
+        # Match the raised support skirt: extend the cleared column downward by
+        # z_offset so the cavity spans the full taller skirt once get_moved()
+        # lifts it by z_offset.
+        skirt_drop = self.support_bar_height + self.z_offset
+        d = down(skirt_drop / 2) ( cube([self.w_mm + eps, self.h_mm + eps, skirt_drop + self.plate_thickness + eps], center = True) )
 
         d = right(self.w_mm / 2) ( back(self.h_mm / 2) ( d ) )
 
