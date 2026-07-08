@@ -816,15 +816,31 @@ class Keyboard():
 
 
     def get_top_section_dimensions(self):
-        # Width and height in mm for each top section. Width is the section's
-        # switch x-span plus the left_margin the splitter reserves for the case
-        # wall - i.e. the extent that was checked against x_build_size. Height is
-        # the full board height, since sections are only split along x.
+        # Width and height in mm of each top section's plate. Width is the actual
+        # kept x-extent after the seam clip, so keyless gaps that get filled
+        # toward a section boundary are counted (a section can be wider than its
+        # switch span alone). Measured the same way get_section_x_clip keeps
+        # plate: between the outermost seams, or the board edge for edge sections.
+        # Height is the full board height, since sections only split along x.
+        (board_min_x, board_max_x, board_max_y, board_min_y) = self.switch_collection.get_collection_bounds()
         dimensions = []
         for section in self.switch_section_list:
-            min_x, max_x, max_y, min_y = section.get_collection_bounds()
-            width = self.parameters.U(max_x - min_x) + self.parameters.left_margin
-            dimensions.append((width, self.parameters.real_case_height))
+            (min_x, max_x, max_y, min_y) = section.get_collection_bounds()
+            bands = self.section_key_seam_bands(
+                section, min_x, max_x, section.has_global_left_neighbor_section(),
+                self.parameters.real_max_x)
+            if len(bands) == 0:
+                dimensions.append((0.0, self.parameters.real_case_height))
+                continue
+            if min_x == board_min_x:
+                left = -self.parameters.left_margin
+            else:
+                left = min(b['left_keep'] for b in bands)
+            if max_x == board_max_x:
+                right = self.parameters.real_max_x + self.parameters.right_margin
+            else:
+                right = max(b['right_keep'] for b in bands)
+            dimensions.append((right - left, self.parameters.real_case_height))
         return dimensions
 
 
