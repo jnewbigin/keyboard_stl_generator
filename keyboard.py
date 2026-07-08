@@ -498,10 +498,10 @@ class Keyboard():
             for (x, ys) in column_keys
         ]
 
-        assignments = self._assign_x_sections(
+        assignments = self._balanced_x_sections(
             columns, self.parameters.x_build_size, self.parameters.left_margin)
 
-        section_count = max((s for column in assignments for s in column), default=0) + 1
+        section_count = max(self._count_sections(assignments), 1)
         while len(self.switch_section_list) < section_count:
             self.switch_section_list.append(ItemCollection())
             self.support_section_list.append(ItemCollection())
@@ -517,20 +517,21 @@ class Keyboard():
             section.set_collection_neighbors()
 
     @staticmethod
-    def _assign_x_sections(columns, x_build_size, left_margin):
+    def _assign_x_sections(columns, threshold, left_margin):
         # Decide which printable x-section each key belongs to, working purely in
         # millimetres so the logic can be unit tested without a Keyboard.
         #
-        #   columns: ascending-x list of (x_start_mm, [x_end_mm, ...]) - one entry
-        #            per x column, listing the right edge of every key in it.
-        #   returns: a list parallel to columns; each element is a list of section
-        #            indices (one per key). Section count is max index + 1.
+        #   columns:   ascending-x list of (x_start_mm, [x_end_mm, ...]) - one entry
+        #              per x column, listing the right edge of every key in it.
+        #   threshold: the widest a section's x-extent (right edge + left_margin,
+        #              measured from the section start) may grow before the next
+        #              key opens a new section.
+        #   returns:   a list parallel to columns; each element is a list of section
+        #              indices (one per key). Section count is max index + 1.
         #
-        # A key stays in the current section while its right edge (plus left_margin
-        # reserved for the case wall) fits within one build plate measured from the
-        # section's start. The section start only advances at a column boundary, so
-        # a wide key straddling the seam is kept whole in the next section rather
-        # than being cut.
+        # The section start only advances at a column boundary, so a wide key
+        # straddling the seam is kept whole in the next section rather than being
+        # cut.
         current_x_start = 0.0
         current_section = 0
         next_section = 0
@@ -540,9 +541,9 @@ class Keyboard():
             column_sections = []
             for x_end_mm in x_ends:
                 reach = x_end_mm + left_margin - current_x_start
-                if reach < x_build_size:
+                if reach < threshold:
                     section = current_section
-                elif reach > x_build_size and next_section > current_section:
+                elif reach > threshold and next_section > current_section:
                     section = next_section
                 else:
                     next_section = current_section + 1
@@ -553,6 +554,39 @@ class Keyboard():
             if next_section > current_section:
                 current_x_start = section_start[next_section]
                 current_section = next_section
+        return assignments
+
+    @staticmethod
+    def _count_sections(assignments):
+        return max((s for column in assignments for s in column), default=-1) + 1
+
+    @staticmethod
+    def _balanced_x_sections(columns, x_build_size, left_margin):
+        # Packing greedily up to the full plate width uses the fewest sections but
+        # fills each to the brim, leaving a thin remainder (e.g. a 27.75u board on a
+        # 300mm plate splits 11.5u / 15.25u / 2u). Section count is monotonic in the
+        # threshold, so keep the greedy section count but re-pack with the smallest
+        # threshold that still yields it - which minimises the widest section and
+        # spreads the keys as evenly as the plate and un-cuttable wide keys allow.
+        target_count = Keyboard._count_sections(
+            Keyboard._assign_x_sections(columns, x_build_size, left_margin))
+        if target_count <= 1:
+            return Keyboard._assign_x_sections(columns, x_build_size, left_margin)
+
+        low, high = 0.0, float(x_build_size)
+        for _ in range(40):
+            mid = (low + high) / 2
+            count = Keyboard._count_sections(
+                Keyboard._assign_x_sections(columns, mid, left_margin))
+            if count <= target_count:
+                high = mid
+            else:
+                low = mid
+
+        assignments = Keyboard._assign_x_sections(columns, high, left_margin)
+        if Keyboard._count_sections(assignments) != target_count:
+            # The search converged just below a step; fall back to the plate width.
+            return Keyboard._assign_x_sections(columns, x_build_size, left_margin)
         return assignments
 
     def get_top_section_remove_block(self, section_number):
