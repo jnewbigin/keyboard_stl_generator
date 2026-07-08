@@ -252,15 +252,19 @@ def main():
             # Create dict for section
             solid_object_dict[section] = {}
 
-            # Add top assembly, plate, and all assembly to section dict
-            solid_object_dict[section]['top'] = color(section_color) ( keyboard.get_assembly(top = True) )
-            solid_object_dict[section]['all'] = color(section_color) ( keyboard.get_assembly(all = True) )
-            solid_object_dict[section]['plate'] = color(section_color) ( keyboard.get_assembly(plate_only = True) )
+            # Add top assembly, plate, and all assembly to section dict. render()
+            # forces CGAL evaluation in the OpenSCAD preview: these trees are far
+            # past the CSG normalization element limit, so a plain F5 preview
+            # aborts normalization and shows nothing. color() must stay outside
+            # render(), which drops any colors inside it.
+            solid_object_dict[section]['top'] = color(section_color) ( render() ( keyboard.get_assembly(top = True) ) )
+            solid_object_dict[section]['all'] = color(section_color) ( render() ( keyboard.get_assembly(all = True) ) )
+            solid_object_dict[section]['plate'] = color(section_color) ( render() ( keyboard.get_assembly(plate_only = True) ) )
 
             # If there is a bottom section for the current section add it to section dict
             if section < keyboard.get_bottom_section_count():
-                solid_object_dict[section]['bottom'] = color(section_color) ( keyboard.get_assembly(bottom = True) )
-                solid_object_dict[section]['case_bottom'] = color(section_color) ( keyboard.get_assembly(case_bottom = True) )
+                solid_object_dict[section]['bottom'] = color(section_color) ( render() ( keyboard.get_assembly(bottom = True) ) )
+                solid_object_dict[section]['case_bottom'] = color(section_color) ( render() ( keyboard.get_assembly(case_bottom = True) ) )
             
     # Create exploded object
     elif args.exploded == True:
@@ -272,11 +276,11 @@ def main():
         for section in range(keyboard.get_top_section_count()):
             keyboard.set_section(section)
             section_color = SECTION_COLORS[section % len(SECTION_COLORS)]
-            solid_object_dict[-1]['top'] += color(section_color) ( up(5 * section) ( right(10 * section) ( keyboard.get_assembly(top = True) ) ) )
-            solid_object_dict[-1]['plate'] += color(section_color) ( up(5 * section) ( right(10 * section) ( keyboard.get_assembly(plate_only = True) ) ) )
+            solid_object_dict[-1]['top'] += color(section_color) ( up(5 * section) ( right(10 * section) ( render() ( keyboard.get_assembly(top = True) ) ) ) )
+            solid_object_dict[-1]['plate'] += color(section_color) ( up(5 * section) ( right(10 * section) ( render() ( keyboard.get_assembly(plate_only = True) ) ) ) )
             if section < keyboard.get_bottom_section_count():
-                solid_object_dict[-1]['bottom'] += color(section_color) ( up(5 * section) ( right(10 * section) ( keyboard.get_assembly(bottom = True) ) ) )
-                solid_object_dict[-1]['case_bottom'] += color(section_color) ( up(5 * section) ( right(10 * section) ( keyboard.get_assembly(case_bottom = True) ) ) )
+                solid_object_dict[-1]['bottom'] += color(section_color) ( up(5 * section) ( right(10 * section) ( render() ( keyboard.get_assembly(bottom = True) ) ) ) )
+                solid_object_dict[-1]['case_bottom'] += color(section_color) ( up(5 * section) ( right(10 * section) ( render() ( keyboard.get_assembly(case_bottom = True) ) ) ) )
     
 
     # Create objects for a specified section
@@ -290,24 +294,24 @@ def main():
         solid_object_dict[args.section] = {}
 
         # Add top assembly, plate, and all assembly to section dict
-        solid_object_dict[args.section]['top'] = color(section_color) ( keyboard.get_assembly(top = True) )
-        solid_object_dict[args.section]['all'] = color(section_color) ( keyboard.get_assembly(all = True) )
-        solid_object_dict[args.section]['plate'] = color(section_color) ( keyboard.get_assembly(plate_only = True) )
+        solid_object_dict[args.section]['top'] = color(section_color) ( render() ( keyboard.get_assembly(top = True) ) )
+        solid_object_dict[args.section]['all'] = color(section_color) ( render() ( keyboard.get_assembly(all = True) ) )
+        solid_object_dict[args.section]['plate'] = color(section_color) ( render() ( keyboard.get_assembly(plate_only = True) ) )
 
         # If there is a bottom section for the current section add it to section dict
         if args.section < keyboard.get_bottom_section_count():
-            solid_object_dict[args.section]['bottom'] = color(section_color) ( keyboard.get_assembly(bottom = True) )
-            solid_object_dict[args.section]['case_bottom'] = color(section_color) ( keyboard.get_assembly(case_bottom = True) )
+            solid_object_dict[args.section]['bottom'] = color(section_color) ( render() ( keyboard.get_assembly(bottom = True) ) )
+            solid_object_dict[args.section]['case_bottom'] = color(section_color) ( render() ( keyboard.get_assembly(case_bottom = True) ) )
 
     # Create an objects that are not split into sections. No other options were specified
     else:
         logger.debug('Create whole object. No other options specified')
         solid_object_dict['all'] = {}
-        solid_object_dict['all']['top'] = keyboard.get_assembly(top = True)
-        solid_object_dict['all']['bottom'] = keyboard.get_assembly(bottom = True)
-        solid_object_dict['all']['all'] = keyboard.get_assembly(all = True)
-        solid_object_dict['all']['plate'] = keyboard.get_assembly(plate_only = True)
-        solid_object_dict['all']['case_bottom'] = keyboard.get_assembly(case_bottom = True)
+        solid_object_dict['all']['top'] = render() ( keyboard.get_assembly(top = True) )
+        solid_object_dict['all']['bottom'] = render() ( keyboard.get_assembly(bottom = True) )
+        solid_object_dict['all']['all'] = render() ( keyboard.get_assembly(all = True) )
+        solid_object_dict['all']['plate'] = render() ( keyboard.get_assembly(plate_only = True) )
+        solid_object_dict['all']['case_bottom'] = render() ( keyboard.get_assembly(case_bottom = True) )
     
     # Add global items that are not dependant on the sctions or parts of the item to build
     solid_object_dict['global'] = {}
@@ -400,8 +404,10 @@ def main():
         assembly_stab_postfix = ('_' + parameters.stabilizer_type) if args.switch_type_in_filename else ''
         for part_name, section_files in assembly_includes.items():
             assembly_file_name = scad_folder_path / (layout_name + '_assembled_' + part_name + assembly_switch_postfix + assembly_stab_postfix + scad_postfix)
+            # No $fn here: each included section file sets its own, and an
+            # assignment in this file would just draw an "overwritten" warning
+            # from every include.
             with open(assembly_file_name, 'w') as assembly_file:
-                assembly_file.write('$fn = %d;\n' % (FRAGMENTS))
                 for section_file in section_files:
                     assembly_file.write('include <%s>\n' % (section_file))
             print('Generated assembly scad file with name', assembly_file_name)
