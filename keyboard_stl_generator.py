@@ -19,6 +19,11 @@ from parameters import Parameters
 from keyboard import Keyboard
 from cable import Cable
 
+# Preview colors given to each section so the pieces are distinguishable in the
+# per-section, exploded and assembled scad views. color() only affects the
+# OpenSCAD preview; rendered STL geometry is unchanged.
+SECTION_COLORS = ['salmon', 'lightgreen', 'lightblue', 'gold', 'plum', 'cyan']
+
 # Set logger level variables
 console_logging_level = logging.WARN
 file_logging_level = logging.DEBUG
@@ -242,18 +247,20 @@ def main():
             # Set current section for generator
             keyboard.set_section(section)
 
+            section_color = SECTION_COLORS[section % len(SECTION_COLORS)]
+
             # Create dict for section
             solid_object_dict[section] = {}
 
             # Add top assembly, plate, and all assembly to section dict
-            solid_object_dict[section]['top'] = keyboard.get_assembly(top = True)
-            solid_object_dict[section]['all'] = keyboard.get_assembly(all = True)
-            solid_object_dict[section]['plate'] = keyboard.get_assembly(plate_only = True)
+            solid_object_dict[section]['top'] = color(section_color) ( keyboard.get_assembly(top = True) )
+            solid_object_dict[section]['all'] = color(section_color) ( keyboard.get_assembly(all = True) )
+            solid_object_dict[section]['plate'] = color(section_color) ( keyboard.get_assembly(plate_only = True) )
 
             # If there is a bottom section for the current section add it to section dict
             if section < keyboard.get_bottom_section_count():
-                solid_object_dict[section]['bottom'] = keyboard.get_assembly(bottom = True)
-                solid_object_dict[section]['case_bottom'] = keyboard.get_assembly(case_bottom = True)
+                solid_object_dict[section]['bottom'] = color(section_color) ( keyboard.get_assembly(bottom = True) )
+                solid_object_dict[section]['case_bottom'] = color(section_color) ( keyboard.get_assembly(case_bottom = True) )
             
     # Create exploded object
     elif args.exploded == True:
@@ -264,11 +271,12 @@ def main():
         solid_object_dict[-1]['case_bottom'] = union()
         for section in range(keyboard.get_top_section_count()):
             keyboard.set_section(section)
-            solid_object_dict[-1]['top'] += up(5 * section) ( right(10 * section) ( keyboard.get_assembly(top = True) ) )
-            solid_object_dict[-1]['plate'] += up(5 * section) ( right(10 * section) ( keyboard.get_assembly(plate_only = True) ) )
+            section_color = SECTION_COLORS[section % len(SECTION_COLORS)]
+            solid_object_dict[-1]['top'] += color(section_color) ( up(5 * section) ( right(10 * section) ( keyboard.get_assembly(top = True) ) ) )
+            solid_object_dict[-1]['plate'] += color(section_color) ( up(5 * section) ( right(10 * section) ( keyboard.get_assembly(plate_only = True) ) ) )
             if section < keyboard.get_bottom_section_count():
-                solid_object_dict[-1]['bottom'] += up(5 * section) ( right(10 * section) ( keyboard.get_assembly(bottom = True) ) )
-                solid_object_dict[-1]['case_bottom'] += up(5 * section) ( right(10 * section) ( keyboard.get_assembly(case_bottom = True) ) )
+                solid_object_dict[-1]['bottom'] += color(section_color) ( up(5 * section) ( right(10 * section) ( keyboard.get_assembly(bottom = True) ) ) )
+                solid_object_dict[-1]['case_bottom'] += color(section_color) ( up(5 * section) ( right(10 * section) ( keyboard.get_assembly(case_bottom = True) ) ) )
     
 
     # Create objects for a specified section
@@ -276,18 +284,20 @@ def main():
         # Set desired section to create
         keyboard.set_section(args.section)
 
+        section_color = SECTION_COLORS[args.section % len(SECTION_COLORS)]
+
         # Create dict for section
         solid_object_dict[args.section] = {}
 
         # Add top assembly, plate, and all assembly to section dict
-        solid_object_dict[args.section]['top'] = keyboard.get_assembly(top = True)
-        solid_object_dict[args.section]['all'] = keyboard.get_assembly(all = True)
-        solid_object_dict[args.section]['plate'] = keyboard.get_assembly(plate_only = True)
+        solid_object_dict[args.section]['top'] = color(section_color) ( keyboard.get_assembly(top = True) )
+        solid_object_dict[args.section]['all'] = color(section_color) ( keyboard.get_assembly(all = True) )
+        solid_object_dict[args.section]['plate'] = color(section_color) ( keyboard.get_assembly(plate_only = True) )
 
         # If there is a bottom section for the current section add it to section dict
         if args.section < keyboard.get_bottom_section_count():
-            solid_object_dict[args.section]['bottom'] = keyboard.get_assembly(bottom = True)
-            solid_object_dict[args.section]['case_bottom'] = keyboard.get_assembly(case_bottom = True)
+            solid_object_dict[args.section]['bottom'] = color(section_color) ( keyboard.get_assembly(bottom = True) )
+            solid_object_dict[args.section]['case_bottom'] = color(section_color) ( keyboard.get_assembly(case_bottom = True) )
 
     # Create an objects that are not split into sections. No other options were specified
     else:
