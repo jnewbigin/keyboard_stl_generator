@@ -616,14 +616,14 @@ class Keyboard():
         # section's kept plate ends on the right and starts on the left (the
         # interlock seam positions used by get_section_x_clip).
         #
-        # The interlock seam normally sits halfway to the neighbouring section's
-        # key. Across a large empty region that midpoint is far away and would
-        # push the section past the build size, so the overhang into a gap is
-        # capped to a small interlock tab. The unowned middle of a big gap is
-        # then left without plate, which is the intended result for sparse
-        # layouts. (max_seam_overhang replaces the original min(..., max_x) cap,
-        # where max_x was a cell count and U(max_x) a meaningless distance.)
-        max_seam_overhang = 0.5
+        # The interlock seam between two sections sits halfway between the last
+        # key of one section and the first key of the next, so the pieces meet
+        # with no gap and no overlap. A keyless gap (e.g. beside the spacebar) is
+        # therefore filled - half by each neighbouring section - reproducing the
+        # solid whole-board plate instead of leaving a void. For adjacent keys
+        # the halfway point is right at the key edge, giving the usual tight
+        # interlock. (An earlier version capped this overhang to a small tab,
+        # which orphaned the middle of a big gap and left it without plate.)
         bands = []
         for rx in section.get_rx_list():
             for ry in section.get_ry_list_in_rx(rx):
@@ -634,16 +634,16 @@ class Keyboard():
                         right_keep = self.parameters.U(item.x + item.w)
                         if item.has_neighbor('right', 'global') == True:
                             neighbor_offset = item.get_neighbor_offset('right', 'global')
-                            right_keep += self.parameters.U(min([neighbor_offset / 2, max_seam_overhang]))
+                            right_keep += self.parameters.U(neighbor_offset / 2)
                         else:
-                            right_keep += self.parameters.U(min([max_x - item.end_x, max_seam_overhang]))
+                            right_keep += self.parameters.U(max_x - item.end_x)
 
                         left_keep = remove_block_length
                         if item.has_neighbor('left', 'global') == True:
                             left_keep = self.parameters.U(item.x)
                             neighbor_offset = item.get_neighbor_offset('left', 'global')
                             if neighbor_offset > 0.0:
-                                left_keep -= self.parameters.U(min([neighbor_offset / 2, max_seam_overhang]))
+                                left_keep -= self.parameters.U(neighbor_offset / 2)
                         elif section_has_left_global_neighbor == True:
                             left_keep = self.parameters.U(min_x)
 
