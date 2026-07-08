@@ -664,6 +664,21 @@ class Keyboard():
         # seam bulge around it - a tab on one side, a notch on the other.
         U = self.parameters.U
         seam = boundaries[boundary_index]
+
+        # Zig-zag the seam to form interlocking fingers. The offset alternates
+        # side to side every section_finger_height of travel; because both
+        # neighbouring sections read this same value the tabs and notches are
+        # exactly complementary. The key-avoidance clamp below then reins any
+        # finger back so it never cuts a key, so fingers only show where there is
+        # spare plate (the top/bottom margins and keyless gaps).
+        finger_depth = self.parameters.section_finger_depth
+        finger_height = self.parameters.section_finger_height
+        if finger_depth > 0 and finger_height > 0:
+            if math.floor(mid_y / finger_height) % 2 == 0:
+                seam += finger_depth
+            else:
+                seam -= finger_depth
+
         for item in self._iter_collection_items(self.switch_section_list[boundary_index]):
             if (item.y - item.h) - 1e-9 <= mid_y <= item.y + 1e-9:
                 seam = max(seam, U(item.x + item.w))

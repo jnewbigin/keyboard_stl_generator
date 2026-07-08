@@ -71,6 +71,15 @@ class Parameters():
         self.y_build_size = 200
         self.kerf = 0.01
 
+        # Interlocking finger joint between printed sections. The shared seam
+        # zig-zags by section_finger_depth (mm) every section_finger_height
+        # (key units) of travel, alternating side to side, so the pieces lock
+        # together. Fingers are clamped so they never cut a key, so they appear
+        # where there is spare plate (the top/bottom margins and keyless gaps).
+        # Set section_finger_depth to 0 for a plain butt-joint seam.
+        self.section_finger_depth = 4.0
+        self.section_finger_height = 2.0
+
         self.switch_type = 'mx_openable'
         self.stabilizer_type = 'cherry_costar'
 
