@@ -174,3 +174,59 @@ class TestSplitKeyboardEndToEnd:
         widths = section_widths(keyboard)
         # No sliver: the smallest section is a decent fraction of the largest.
         assert min(widths) > 0.6 * max(widths)
+
+
+def _band_mids(keyboard):
+    edges = keyboard._board_y_band_edges()
+    return [(lo + hi) / 2.0 for lo, hi in zip(edges, edges[1:]) if hi - lo > 1e-9]
+
+
+class TestSharedSectionSeams:
+    def test_seam_never_cuts_a_key(self):
+        # The shared seam must never fall strictly inside a key on that key's row,
+        # or the switch cutout would be split across two sections.
+        keyboard = build_keyboard("wide_board.json", x_build_size=300)
+        U = keyboard.parameters.U
+        boundaries = keyboard._section_x_boundaries()
+        for boundary in range(len(keyboard.switch_section_list) - 1):
+            for mid in _band_mids(keyboard):
+                seam = keyboard._section_seam_x(boundary, boundaries, mid)
+                for section_index in (boundary, boundary + 1):
+                    section = keyboard.switch_section_list[section_index]
+                    for item in keyboard._iter_collection_items(section):
+                        if (item.y - item.h) - 1e-9 <= mid <= item.y + 1e-9:
+                            left = U(item.x)
+                            right = U(item.x + item.w)
+                            assert not (left + 1e-6 < seam < right - 1e-6), \
+                                f"seam {seam} cuts key [{left}, {right}] on boundary {boundary}"
+
+    def test_seam_is_shared_so_neighbours_are_complementary(self):
+        # Section i's right seam and section i+1's left seam are the same value on
+        # every row - this is what makes the pieces mesh with no overlap/void.
+        keyboard = build_keyboard("wide_board.json", x_build_size=300)
+        boundaries = keyboard._section_x_boundaries()
+        for boundary in range(len(keyboard.switch_section_list) - 1):
+            for mid in _band_mids(keyboard):
+                # section `boundary` uses this as its right edge; section
+                # `boundary + 1` uses the same call as its left edge.
+                right_edge = keyboard._section_seam_x(boundary, boundaries, mid)
+                left_edge = keyboard._section_seam_x(boundary, boundaries, mid)
+                assert right_edge == left_edge
+
+    def test_fingers_move_the_seam_on_some_rows(self):
+        # A finger depth must deflect the seam on at least some rows (the tabs);
+        # depth 0 is a plain butt joint. The deflection shows where there is spare
+        # plate - key rows are clamped, so this compares row by row.
+        keyboard = build_keyboard("wide_board.json", x_build_size=300)
+        boundaries = keyboard._section_x_boundaries()
+        mids = _band_mids(keyboard)
+
+        keyboard.parameters.section_finger_depth = 0.0
+        flat = [keyboard._section_seam_x(0, boundaries, mid) for mid in mids]
+
+        keyboard.parameters.section_finger_depth = 4.0
+        fingered = [keyboard._section_seam_x(0, boundaries, mid) for mid in mids]
+
+        assert flat != fingered
+        # Every fingered seam stays within a finger depth of the butt-joint seam.
+        assert all(abs(f - b) <= 4.0 + 1e-6 for f, b in zip(fingered, flat))
