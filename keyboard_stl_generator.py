@@ -396,5 +396,17 @@ def main():
 
     logger.info('Generation Complete')
 
+    # Summary of the sections the board was split into and their size relative to
+    # the configured build plate.
+    section_dimensions = keyboard.get_top_section_dimensions()
+    print('\nSection summary (build plate %.1f x %.1f mm):'
+          % (parameters.x_build_size, parameters.y_build_size))
+    print('  %d top section(s), %d bottom section(s)'
+          % (keyboard.get_top_section_count(), keyboard.get_bottom_section_count()))
+    for section_number, (width, height) in enumerate(section_dimensions):
+        fits = width <= parameters.x_build_size and height <= parameters.y_build_size
+        print('    Section %d: %.1f x %.1f mm%s'
+              % (section_number, width, height, '' if fits else '  (exceeds build plate!)'))
+
 if __name__ == "__main__":
     main()

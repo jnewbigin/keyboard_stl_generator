@@ -486,76 +486,74 @@ class Keyboard():
         y_parts = math.ceil(abs(min_y) / self.build_y)
         self.logger.debug('x_parts: %d, y_parts: %d', x_parts, y_parts)
 
-        x_per_part = math.ceil(max_x / x_parts)
-        y_per_part = math.floor(min_y / y_parts)
-        self.logger.debug('x_per_part: %d, y_per_part: %d', x_per_part, y_per_part)
+        # Walk the keys column by column (ascending x, matching the seam logic in
+        # _assign_x_sections) and describe each column as its left edge in mm plus
+        # the right edge of every key in it. The pure seam math decides which
+        # section each key belongs to; distributing the actual items is separate.
+        column_keys = [(x, self.switch_collection.get_sorted_y_list_in_x(x))
+                       for x in self.switch_collection.get_sorted_x_list()]
+        columns = [
+            (self.parameters.U(x),
+             [self.switch_collection.get_item(x, y).x_end_mm for y in ys])
+            for (x, ys) in column_keys
+        ]
 
-        # Split on the even per-part width rather than the raw build size. Packing
-        # greedily up to x_build_size made the first sections as wide as the build
-        # plate allows and left a thin remainder section; dividing max_x into
-        # x_parts equal pieces (each guaranteed <= build_x) keeps them balanced.
-        x_per_part_size = x_per_part * self.parameters.switch_spacing
+        assignments = self._assign_x_sections(
+            columns, self.parameters.x_build_size, self.parameters.left_margin)
 
-        # Union all standard switch cutouts together
-        current_x_start = 0.0
-        # current_y_start = 0.0
-        current_x_section = 0
-        # current_y_section = 0
-        next_x_section = 0
-        # next_y_section = 0
-        
-        # build_area = left(self.parameters.left_margin) ( back(self.y_build_size - self.parameters.top_margin) ( down(10) ( cube([self.parameters.x_build_size, self.y_build_size, 10]) ) ) )
+        section_count = max((s for column in assignments for s in column), default=0) + 1
+        while len(self.switch_section_list) < section_count:
+            self.switch_section_list.append(ItemCollection())
+            self.support_section_list.append(ItemCollection())
+            self.support_cutout_section_list.append(ItemCollection())
 
-        switch_object_dict = self.switch_collection.get_collection_dict()
-        for x in self.switch_collection.get_sorted_x_list():
-            for y in self.switch_collection.get_sorted_y_list_in_x(x):
-                # self.logger.debug('\tx: %d, y: %d', x, y)
-                # switch_cutouts += x_row[y].get_moved()
-                current_switch: Switch = self.switch_collection.get_item(x, y)
-                current_support = self.support_collection.get_item(x, y)
-                current_support_cutout = self.support_cutout_collection.get_item(x, y)
-                w = current_switch.w
-                h = current_switch.h
-                cell_value = current_switch.cell_value
+        for (x, ys), column_sections in zip(column_keys, assignments):
+            for y, section in zip(ys, column_sections):
+                self.switch_section_list[section].add_item(x, y, self.switch_collection.get_item(x, y))
+                self.support_section_list[section].add_item(x, y, self.support_collection.get_item(x, y))
+                self.support_cutout_section_list[section].add_item(x, y, self.support_cutout_collection.get_item(x, y))
 
-                switch_x_max = current_switch.x_end_mm + self.parameters.left_margin
-                # switch_x_min = current_switch.x_start_mm + self.parameters.left_margin
-                # switch_y_max = current_switch.y_end_mm + self.parameters.top_margin
-                # switch_y_min = current_switch.y_start_mm + self.parameters.top_margin
-
-                if switch_x_max - current_x_start < x_per_part_size:
-                    # self.logger.debug('current_x_section:', current_x_section)
-                    self.switch_section_list[current_x_section].add_item(x, y, current_switch)
-                    self.support_section_list[current_x_section].add_item(x, y, current_support)
-                    self.support_cutout_section_list[current_x_section].add_item(x, y, current_support_cutout)
-                elif switch_x_max - current_x_start > x_per_part_size and next_x_section > current_x_section:
-                    self.switch_section_list[next_x_section].add_item(x, y, current_switch)
-                    self.support_section_list[next_x_section].add_item(x, y, current_support)
-                    self.support_cutout_section_list[next_x_section].add_item(x, y, current_support_cutout)
-                else:
-                    # self.logger.debug('switch_x_max:', switch_x_max, 'current_x_start:', current_x_start, 'switch_x_max - current_x_start:', switch_x_max - current_x_start, 'x_build_size:', x_build_size)
-                    next_x_section = current_x_section + 1
-                    self.switch_section_list.append(ItemCollection())
-                    self.switch_section_list[next_x_section].add_item(x, y, current_switch)
-
-                    self.support_section_list.append(ItemCollection())
-                    self.support_section_list[next_x_section].add_item(x, y, current_support)
-
-                    self.support_cutout_section_list.append(ItemCollection())
-                    self.support_cutout_section_list[next_x_section].add_item(x, y, current_support_cutout)
-
-                
-                # self.logger.debug('\tswitch_x: (', switch_x_min, ',', switch_x_max, '), switch_y: (', switch_y_min, switch_y_max, ')')
-            
-            if next_x_section > current_x_section:
-                # current_x_start = self.switch_section_list[next_x_section][0]['switch_x_min']
-                current_x_start = self.parameters.U(self.switch_section_list[next_x_section].get_min_x())
-                # self.logger.debug('current_x_start: %f', current_x_start)
-                current_x_section = next_x_section
-
-        for idx, section in enumerate(self.switch_section_list):
-            # self.logger.debug('Set Item neighbors for section %d', idx)
+        for section in self.switch_section_list:
             section.set_collection_neighbors()
+
+    @staticmethod
+    def _assign_x_sections(columns, x_build_size, left_margin):
+        # Decide which printable x-section each key belongs to, working purely in
+        # millimetres so the logic can be unit tested without a Keyboard.
+        #
+        #   columns: ascending-x list of (x_start_mm, [x_end_mm, ...]) - one entry
+        #            per x column, listing the right edge of every key in it.
+        #   returns: a list parallel to columns; each element is a list of section
+        #            indices (one per key). Section count is max index + 1.
+        #
+        # A key stays in the current section while its right edge (plus left_margin
+        # reserved for the case wall) fits within one build plate measured from the
+        # section's start. The section start only advances at a column boundary, so
+        # a wide key straddling the seam is kept whole in the next section rather
+        # than being cut.
+        current_x_start = 0.0
+        current_section = 0
+        next_section = 0
+        section_start = {}
+        assignments = []
+        for x_start_mm, x_ends in columns:
+            column_sections = []
+            for x_end_mm in x_ends:
+                reach = x_end_mm + left_margin - current_x_start
+                if reach < x_build_size:
+                    section = current_section
+                elif reach > x_build_size and next_section > current_section:
+                    section = next_section
+                else:
+                    next_section = current_section + 1
+                    section = next_section
+                section_start.setdefault(section, x_start_mm)
+                column_sections.append(section)
+            assignments.append(column_sections)
+            if next_section > current_section:
+                current_x_start = section_start[next_section]
+                current_section = next_section
+        return assignments
 
     def get_top_section_remove_block(self, section_number):
         section = self.switch_section_list[section_number]
@@ -781,6 +779,19 @@ class Keyboard():
 
     def get_top_section_count(self):
         return len(self.switch_section_list)
+
+
+    def get_top_section_dimensions(self):
+        # Width and height in mm for each top section. Width is the section's
+        # switch x-span plus the left_margin the splitter reserves for the case
+        # wall - i.e. the extent that was checked against x_build_size. Height is
+        # the full board height, since sections are only split along x.
+        dimensions = []
+        for section in self.switch_section_list:
+            min_x, max_x, max_y, min_y = section.get_collection_bounds()
+            width = self.parameters.U(max_x - min_x) + self.parameters.left_margin
+            dimensions.append((width, self.parameters.real_case_height))
+        return dimensions
 
 
     def get_bottom_section_count(self):
