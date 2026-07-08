@@ -322,6 +322,9 @@ def main():
     ############################################################
     subprocess_dict = {}
 
+    # Per-part lists of the section scad files, used to build assembly views.
+    assembly_includes = {}
+
     switch_type_for_filename = ''
     stab_type_for_filename = ''
 
@@ -359,7 +362,12 @@ def main():
                 # OpenSCAD's (non-nesting) comment parsing.
                 scad_render_to_file(solid_object_dict[section][part_name], scad_file_name, file_header=f'$fn = {FRAGMENTS};', include_orig_code=False)
                 print('Generated scad file with name', scad_file_name)
-                
+
+                # Record per-section files so they can be stitched into an
+                # assembly view (see below). Only real numbered sections apply.
+                if isinstance(section, int) and section > -1:
+                    assembly_includes.setdefault(part_name, []).append(scad_file_name.name)
+
                 # Render STL if option is chosen
                 if args.render:
                     logger.debug('Render STL from SCAD')
@@ -369,6 +377,26 @@ def main():
                     subprocess_dict[stl_file_name] = subprocess.Popen(openscad_command_list)
     
     
+    ################################################################
+    #  Write assembly views
+    ################################################################
+    # For each part that was split into sections, write a scad file that includes
+    # every section's file so the pieces can be viewed together as the assembled
+    # keyboard. The sections are clipped in place, so including them reconstructs
+    # the whole board. The assembly file sits alongside the section files, so a
+    # bare filename include resolves relative to it.
+    if args.all_sections == True:
+        assembly_switch_postfix = ('_' + parameters.switch_type) if args.switch_type_in_filename else ''
+        assembly_stab_postfix = ('_' + parameters.stabilizer_type) if args.switch_type_in_filename else ''
+        for part_name, section_files in assembly_includes.items():
+            assembly_file_name = scad_folder_path / (layout_name + '_assembled_' + part_name + assembly_switch_postfix + assembly_stab_postfix + scad_postfix)
+            with open(assembly_file_name, 'w') as assembly_file:
+                assembly_file.write('$fn = %d;\n' % (FRAGMENTS))
+                for section_file in section_files:
+                    assembly_file.write('include <%s>\n' % (section_file))
+            print('Generated assembly scad file with name', assembly_file_name)
+
+
     ################################################################
     #  Wait for render processes to complete
     ################################################################
