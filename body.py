@@ -3,6 +3,7 @@ import math
 import sys
 
 from solid import *
+from solid import OpenSCADObject
 from solid.utils import *
 
 import logging
@@ -14,7 +15,7 @@ from parameters import Parameters
 
 class Body():
 
-    def __init__(self, parameters: Parameters = Parameters()):
+    def __init__(self, parameters: Parameters = Parameters()) -> None:
 
         self.parameters = parameters
 
@@ -39,6 +40,8 @@ class Body():
         self.screw_count = self.parameters.screw_count
         self.screw_diameter = self.parameters.screw_diameter
         self.screw_edge_inset = self.parameters.screw_edge_inset
+        assert self.parameters.screw_edge_x_inset is not None
+        assert self.parameters.screw_edge_y_inset is not None
         self.screw_edge_x_inset = self.parameters.screw_edge_x_inset
         self.screw_edge_y_inset = self.parameters.screw_edge_y_inset
         self.screw_hole_body_wall_width = self.parameters.screw_hole_body_wall_width
@@ -63,10 +66,20 @@ class Body():
         # if self.parameter_dict is not None:
         #     self.build_attr_from_dict(self.parameter_dict)
 
-        self.screw_hole_coordinates = []
+        self.screw_hole_coordinates: list = []
 
-        self.screw_hole_info = {}
+        self.screw_hole_info: dict = {}
 
+        assert self.parameters.case_height_base_removed is not None
+        assert self.parameters.case_height_extra_fill is not None
+        assert self.parameters.side_margin_diff is not None
+        assert self.parameters.top_margin_diff is not None
+        assert self.parameters.screw_tap_hole_diameter is not None
+        assert self.parameters.screw_hole_body_diameter is not None
+        assert self.parameters.screw_hole_body_radius is not None
+        assert self.parameters.x_screw_width is not None
+        assert self.parameters.y_screw_width is not None
+        assert self.parameters.bottom_section_count is not None
         self.case_height_base_removed = self.parameters.case_height_base_removed
         self.case_height_extra_fill = self.parameters.case_height_extra_fill
         self.side_margin_diff = self.parameters.side_margin_diff
@@ -132,8 +145,19 @@ class Body():
         # self.update_calculated_attributes()
 
     
-    def update_calculated_attributes(self):
+    def update_calculated_attributes(self) -> None:
         # Calculated attributes
+        assert self.parameters.case_height_base_removed is not None
+        assert self.parameters.case_height_extra_fill is not None
+        assert self.parameters.side_margin_diff is not None
+        assert self.parameters.top_margin_diff is not None
+        assert self.parameters.screw_tap_hole_diameter is not None
+        assert self.parameters.screw_hole_body_diameter is not None
+        assert self.parameters.screw_hole_body_radius is not None
+        assert self.parameters.x_screw_width is not None
+        assert self.parameters.y_screw_width is not None
+        assert self.parameters.bottom_section_count is not None
+        assert self.parameters.screw_hole_body_support_end_x is not None
         self.case_height_base_removed = self.parameters.case_height_base_removed
         self.case_height_extra_fill = self.parameters.case_height_extra_fill
         self.side_margin_diff = self.parameters.side_margin_diff
@@ -169,7 +193,7 @@ class Body():
     #     self.update_calculated_attributes()
 
 
-    def build_attr_from_dict(self, parameter_dict):
+    def build_attr_from_dict(self, parameter_dict: dict) -> None:
         for param in parameter_dict.keys():
             value = parameter_dict[param]
             
@@ -179,12 +203,12 @@ class Body():
             #     self.logger.debug('%s: %s, self.screw_count: %s', str(param), str(value), str(self.screw_count))
     
     
-    def set_parameter_dict(self, parameter_dict):
+    def set_parameter_dict(self, parameter_dict: dict) -> None:
         self.parameter_dict = parameter_dict
         self.build_attr_from_dict(self.parameter_dict)
         self.update_calculated_attributes()
 
-    def plate(self, case_x, case_y, pre_minkowski_thickness, round_corner):
+    def plate(self, case_x: float, case_y: float, pre_minkowski_thickness: float, round_corner: OpenSCADObject) -> OpenSCADObject:
         
 
         # Get absolute value of min_y to get real y value
@@ -266,7 +290,7 @@ class Body():
         return plate_object
 
 
-    def case_body_block(self, case_x, case_y, round_corner):
+    def case_body_block(self, case_x: float, case_y: float, round_corner: OpenSCADObject) -> OpenSCADObject:
         # Create case wall part
         case_block = cube([case_x, case_y, self.case_height_extra_fill], center = True)
 
@@ -276,7 +300,7 @@ class Body():
         return case_block
 
 
-    def case_border(self, case_x, case_y, round_corner, square_corner):
+    def case_border(self, case_x: float, case_y: float, round_corner: OpenSCADObject, square_corner: OpenSCADObject) -> OpenSCADObject:
         
 
         # Create case wall part
@@ -301,7 +325,7 @@ class Body():
         # Return the case wall object
         return case_wall
 
-    def case(self, body_block_only = False, plate_only = False, walls_only = False):
+    def case(self, body_block_only: bool = False, plate_only: bool = False, walls_only: bool = False) -> OpenSCADObject:
         # Get the margins for the plate without the ammount that the minkowski will add
         pre_minkowski_x_margin = ((self.right_margin + self.left_margin) / 2 - self.plate_corner_radius)
         pre_minkowski_y_margin = ((self.top_margin + self.bottom_margin) / 2 - self.plate_corner_radius)
@@ -341,7 +365,7 @@ class Body():
         return case_object
 
 
-    def screw_hole(self, tap = False):
+    def screw_hole(self, tap: bool = False) -> OpenSCADObject | None:
         try:
             if tap == False:
                 radius = self.screw_diameter / 2
@@ -353,7 +377,7 @@ class Body():
         return cylinder(r = radius, h = self.case_height_extra_fill * 4, center = True)
 
 
-    def screw_hole_body_support(self, direction = 'right', screw_name = ''):
+    def screw_hole_body_support(self, direction: str = 'right', screw_name: str = '') -> OpenSCADObject:
         # self.logger.debug('screw_hole_body_support: screw_name: %s, direction: %s', screw_name, direction)
         x_offset = self.screw_hole_body_radius
         self.screw_hole_body_support_end_x = (self.case_height_extra_fill / self.screw_hole_body_support_x_factor) + x_offset
@@ -386,7 +410,7 @@ class Body():
         return hole_support
 
 
-    def screw_hole_body(self, left_support = False, right_support = False, forward_support = False, back_support = False, screw_name = ''):
+    def screw_hole_body(self, left_support: bool = False, right_support: bool = False, forward_support: bool = False, back_support: bool = False, screw_name: str = '') -> OpenSCADObject:
 
         hole_body = cylinder(r = self.screw_hole_body_radius, h = self.case_height_extra_fill)
 
@@ -404,7 +428,7 @@ class Body():
         return hole_body
 
 
-    def generate_screw_holes_coordinates(self):
+    def generate_screw_holes_coordinates(self) -> None:
         
 
         # screw_hole_collection = union()
@@ -437,8 +461,8 @@ class Body():
 
             # self.logger.debug('remaining_screw_count: %f', type(remaining_screw_count))
 
-            x_per_screw_spacing = 0
-            y_per_screw_spacing = 0
+            x_per_screw_spacing = 0.0
+            y_per_screw_spacing = 0.0
 
             for i in range(remaining_screw_count):
                 x_per_screw_spacing = self.x_screw_width / (x_screw_count + 1)
@@ -505,7 +529,7 @@ class Body():
             }
         
 
-    def screw_hole_objects(self, tap = False):
+    def screw_hole_objects(self, tap: bool = False) -> tuple[OpenSCADObject, OpenSCADObject, OpenSCADObject]:
         
 
         if len(self.screw_hole_info.keys()) == 0:
@@ -530,7 +554,9 @@ class Body():
                 # self.logger.debug('coord: %s', str(coord))
                 continue
 
-            hole = right(x) ( forward(y) ( self.screw_hole(tap = tap) ) )
+            screw_hole = self.screw_hole(tap = tap)
+            assert screw_hole is not None
+            hole = right(x) ( forward(y) ( screw_hole ) )
             screw_hole_collection += hole
 
             right_support = True
@@ -636,7 +662,7 @@ class Body():
         
     
 
-    def bottom_cover(self):
+    def bottom_cover(self) -> OpenSCADObject:
 
         if self.bottom_cover_thickness > 0:
             plate = down(self.bottom_cover_thickness) ( left(self.real_case_width / 2) ( back(self.real_case_height / 2) ( cube([self.real_case_width * 2, self.real_case_height * 2, self.bottom_cover_thickness]) ) ) )

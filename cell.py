@@ -1,4 +1,5 @@
 from solid import *
+from solid import OpenSCADObject
 from solid.utils import *
 
 import logging
@@ -35,11 +36,14 @@ class Cell:
     # COSTAR_NOTCH_SWITCH_SIDE_X_OFFSET = 1.65
     # SIDE_NOTCH_FAR_SIDE_X_OFFSET = 4.2
 
-    def __init__(self, x: float, y: float, w: float = 1.0, h: float = 1.0, rotation = 0.0,  r_x_offset = 0.0, r_y_offset = 0.0, z_offset = 0.0, cell_value = '', parameters: Parameters = Parameters()):
+    def __init__(self, x: float, y: float, w: float = 1.0, h: float = 1.0, rotation: float = 0.0,  r_x_offset: float = 0.0, r_y_offset: float = 0.0, z_offset: float = 0.0, cell_value: str = '', parameters: Parameters = Parameters()) -> None:
 
         self.logger = logging.getLogger().getChild(__name__)
 
         self.parameters = parameters
+
+        # Set by subclasses (Switch, Support, ...) to the built OpenSCAD geometry.
+        self.solid: OpenSCADObject
 
         self.x = x
         self.y = y
@@ -58,7 +62,7 @@ class Cell:
 
         self.rotaton = rotation
 
-        self.rotation_info = {
+        self.rotation_info: dict[str, dict[str, float]] = {
             'top_left': {
                 'order': 0
             },
@@ -107,13 +111,13 @@ class Cell:
     # def u(u_value):
     #     return u_value * Cell.SWITCH_SPACING
 
-    def __str__(self):
+    def __str__(self) -> str:
         return '%s (%f, %f)' % (self.cell_value, self.x, self.y)
-    
-    def get(self):
+
+    def get(self) -> OpenSCADObject:
         return self.solid
 
-    def get_moved(self):
+    def get_moved(self) -> OpenSCADObject:
         return up(self.z_offset) ( right(self.x_start_mm) ( forward(self.y_start_mm) ( self.solid ) ) )
 
     def get_start_x(self) -> float: 
@@ -182,19 +186,19 @@ class Cell:
         
         return min_y
 
-    def hypotenuse(self, adjacent, opposite):
+    def hypotenuse(self, adjacent: float, opposite: float) -> float:
         return math.sqrt((float(adjacent) ** 2) + (float(opposite) ** 2))
 
-    def get_hypotenuse_start_angle(self, adjacent, opposite):
+    def get_hypotenuse_start_angle(self, adjacent: float, opposite: float) -> float:
         try:
             tan = float(opposite) / float(adjacent)
         except ZeroDivisionError:
             
             # angle = 90
             if self.rotaton < 0.0:
-                angle = 90
+                angle = 90.0
             else:
-                angle = -90
+                angle = -90.0
             
             return angle
 
@@ -202,7 +206,7 @@ class Cell:
         angle = math.degrees(angle)
         return angle
 
-    def get_opposite(self, angle, hypotenuse):
+    def get_opposite(self, angle: float, hypotenuse: float) -> float:
         sin_angle = math.sin(math.radians(angle))
         opposite = sin_angle * hypotenuse
         if self.rotaton < 0.0:
@@ -210,7 +214,7 @@ class Cell:
         
         return opposite
 
-    def get_adjacent(self, angle, hypotenuse):
+    def get_adjacent(self, angle: float, hypotenuse: float) -> float:
         cos_angle = math.cos(math.radians(angle))
         adjacent = cos_angle * hypotenuse
         if self.rotaton < 0.0:
@@ -219,7 +223,7 @@ class Cell:
         return adjacent
 
 
-    def get_rotation_info_points(self):
+    def get_rotation_info_points(self) -> list[list[float]]:
         points_orig = []
         points = []
         
@@ -231,14 +235,14 @@ class Cell:
         return points
     
     
-    def build_rotation_info(self):
+    def build_rotation_info(self) -> None:
 
         # if self.cell_value in ('CC', 'DD', 'HH', 'II', 'JJ', 'LL'):
         #     self.logger.debug('Build Rotation Info for key %s', str(self))
 
         for corner_name in self.rotation_info.keys():
-            adjacent = 0
-            opposite = 0
+            adjacent = 0.0
+            opposite = 0.0
             if corner_name == 'top_left':
                 adjacent = self.x_min
                 opposite = self.y_max

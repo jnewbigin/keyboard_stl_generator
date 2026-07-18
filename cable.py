@@ -1,4 +1,5 @@
 from solid import *
+from solid import OpenSCADObject
 from solid.utils import *
 
 import logging
@@ -8,7 +9,7 @@ from parameters import Parameters
 
 class Cable():
 
-    def __init__(self, parameters: Parameters = None):
+    def __init__(self, parameters: Parameters) -> None:
 
 
         self.logger = logging.getLogger().getChild(__name__)
@@ -73,7 +74,7 @@ class Cable():
 
 
 
-    def holder_full(self):
+    def holder_full(self) -> OpenSCADObject:
 
         # Calculate the total stop plate width
         cable_hole_plate_width = self.parameters.cable_hole_width + (self.stop_plate_overhang * 2)
@@ -104,7 +105,7 @@ class Cable():
 
 
 
-    def holder_hole(self, include_slot = False):
+    def holder_hole(self, include_slot: bool = False) -> OpenSCADObject:
         
         # Main cable hole
         hole = cylinder(
@@ -139,7 +140,7 @@ class Cable():
         return hole
 
 
-    def clip(self):
+    def clip(self) -> OpenSCADObject:
 
         # Clip polygon
         poly_points = [
@@ -162,7 +163,7 @@ class Cable():
 
 
     
-    def holder_main(self):
+    def holder_main(self) -> OpenSCADObject:
         
         # Get full holder
         holder_main_body = self.holder_full()
@@ -177,7 +178,7 @@ class Cable():
 
 
 
-    def holder_clamp(self, clamp_remove_block = False):
+    def holder_clamp(self, clamp_remove_block: bool = False) -> OpenSCADObject:
         # Declare parameters used to provide spacing for the clamp in the main cable holder
         clamp_holder_gap = self.clamp_holder_gap
         clamp_holder_extra = 0.0
@@ -241,15 +242,16 @@ class Cable():
 
 
 
-    def holder_all(self):
+    def holder_all(self) -> OpenSCADObject:
 
         # Get a version of the cable holder with the main holder and clamp in an assembled view
         return self.holder_main() + up(0) ( self.holder_clamp() )
 
 
-    def get_cable_hole(self):
+    def get_cable_hole(self) -> OpenSCADObject:
 
         if self.parameters.cable_hole == True:
+            assert self.parameters.case_height_base_removed is not None
             return up(self.parameters.case_height_base_removed - (self.parameters.cable_hole_height / 2) - self.parameters.plate_thickness - self.parameters.cable_hole_down_offset ) (
                 right(self.parameters.left_margin + (self.parameters.real_max_x / 2)) ( 
                     forward(self.parameters.bottom_margin + self.parameters.top_margin + self.parameters.real_max_y) ( 

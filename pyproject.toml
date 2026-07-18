@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Generate OpenSCAD/STL files for custom mechanical keyboard plates and cases"
 readme = "README.md"
 license = "GPL-3.0-or-later"
-requires-python = ">=3.8,<4.0"
+requires-python = ">=3.14,<4.0"
 dependencies = [
     "setuptools (>=59.6.0)",
     "solidpython (>=1.1.3)",
@@ -16,6 +16,18 @@ package-mode = false
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0"
+mypy = "^1.11"
+
+[tool.mypy]
+python_version = "3.14"
+ignore_missing_imports = true
+# solidpython ships no type information. The local stubs in stubs/solid type its
+# geometry builders (union(), cube(), up(), ...) as returning OpenSCADObject so a
+# `solid = union()` local isn't narrowed to the builder's own class, which would
+# otherwise flag every later reassignment to a base OpenSCADObject.
+mypy_path = "stubs"
+files = ["."]
+exclude = ["tests/"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

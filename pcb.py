@@ -3,6 +3,7 @@ import math
 import sys
 
 from solid import *
+from solid import OpenSCADObject
 from solid.utils import *
 
 import logging
@@ -14,7 +15,7 @@ from parameters import Parameters
 
 class PCB():
 
-    def __init__(self, parameters: Parameters = Parameters()):
+    def __init__(self, parameters: Parameters = Parameters()) -> None:
 
         self.parameters = parameters
 
@@ -36,9 +37,11 @@ class PCB():
         self.pcb_plate_separation = 5
     
 
-    def get_model(self, remove_above = False, remove_bellow = False):
+    def get_model(self, remove_above: bool = False, remove_bellow: bool = False) -> OpenSCADObject:
 
         if self.custom_pcb == True:
+            assert self.pcb_case_left_margin is not None
+            assert self.pcb_case_bottom_margin is not None
             model_height = self.pcb_thickness
             down_offset = self.pcb_thickness + self.pcb_plate_separation
 
