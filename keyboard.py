@@ -4,7 +4,10 @@ import math
 import logging
 import sys
 
+from typing import Any, Iterator
+
 from solid import *
+from solid import OpenSCADObject
 from solid.utils import *
 
 from switch import Switch
@@ -24,7 +27,7 @@ from shape_cutout import ShapeCutout
 
 class Keyboard():
 
-    def __init__(self, parameters: Parameters = Parameters()):
+    def __init__(self, parameters: Parameters = Parameters()) -> None:
 
         self.parameters = parameters
 
@@ -34,7 +37,7 @@ class Keyboard():
 
         self.kerf = self.parameters.kerf
 
-        self.body = None
+        self.body: Body | None = None
 
         self.desired_section_number = -1
 
@@ -77,7 +80,7 @@ class Keyboard():
 
 
 
-    def process_keyboard_layout(self, keyboard_layout_dict):
+    def process_keyboard_layout(self, keyboard_layout_dict: Any) -> None:
         y = 0.0
         rotation = 0.0
         rx = 0.0
@@ -94,9 +97,11 @@ class Keyboard():
             if type(row) == type([]):
                 # A flag to be used to ignore non key data from the layout file
                 ignore_next = False
-                for col in row:               
+                col: Any
+                for col in row:
                     if type(col) == type({}):
 
+                        key: Any
                         for key in col.keys():
                             modifier_type = key
                             
@@ -174,7 +179,7 @@ class Keyboard():
         # create sections of the keyboard for usin in splitting for printing
         self.split_keyboard()
 
-    def process_custom_shapes(self):
+    def process_custom_shapes(self) -> None:
         
 
         if self.parameters.custom_polygons is not None:
@@ -190,7 +195,7 @@ class Keyboard():
                     self.custom_polygon_collection.add_item(x, y, custom_shape)
 
 
-    def get_assembly(self, top = False, bottom = False, all = True, plate_only = False, case_bottom = False):
+    def get_assembly(self, top: bool = False, bottom: bool = False, all: bool = True, plate_only: bool = False, case_bottom: bool = False) -> OpenSCADObject:
         
         
         # Init top_assembly and bottom_assembly objects
@@ -249,6 +254,7 @@ class Keyboard():
         pcb_model = self.pcb.get_model()
 
         # Add case to top_assembly
+        assert self.body is not None
         top_assembly += self.body.case(plate_only = plate_only, walls_only = case_bottom)
 
         if self.parameters.simple_test == False and case_bottom == False:
@@ -264,6 +270,7 @@ class Keyboard():
         screw_hole_body_collection = None
         screw_hole_body_scaled_collection = None
         if self.parameters.screw_count > 0:
+            assert self.body is not None
             screw_hole_collection, screw_hole_body_collection, screw_hole_body_scaled_collection = self.body.screw_hole_objects(tap = bottom or case_bottom)
 
             # Remove screw holes from top top_assembly
@@ -272,6 +279,7 @@ class Keyboard():
             bottom_assembly = screw_hole_body_collection
             bottom_assembly -= screw_hole_collection
 
+        assert self.body is not None
         body_block = self.body.case(body_block_only = True)
         
         # Remove items marked as not part of desired section
@@ -282,6 +290,7 @@ class Keyboard():
             # bottom_assembly -= self.get_bottom_section_remove_block(self.desired_section_number)
         
 
+        assert self.parameters.case_height_base_removed is not None
         self.custom_polygon_cutout_collection = up(self.parameters.case_height_base_removed - (self.parameters.plate_thickness / 2)) (
             self.custom_polygon_cutout_collection
         )
@@ -309,6 +318,8 @@ class Keyboard():
         )
         
         if screw_hole_collection is not None:
+            assert screw_hole_body_collection is not None
+            assert screw_hole_body_scaled_collection is not None
             screw_hole_collection = up(self.parameters.case_height_base_removed - (self.parameters.plate_thickness / 2)) (
                 forward(self.parameters.real_max_y + self.parameters.bottom_margin) (
                     right(self.parameters.left_margin) (
@@ -382,6 +393,9 @@ class Keyboard():
 
             top_assembly *= test_block
             bottom_assembly *= test_block
+            assert screw_hole_collection is not None
+            assert screw_hole_body_collection is not None
+            assert screw_hole_body_scaled_collection is not None
             screw_hole_collection *= test_block
             screw_hole_body_collection *= test_block
             screw_hole_body_scaled_collection *= test_block
@@ -395,6 +409,8 @@ class Keyboard():
             top_assembly = rotate(self.parameters.tilt, [1, 0, 0]) ( top_assembly )
             bottom_assembly = rotate(self.parameters.tilt, [1, 0, 0]) ( bottom_assembly )
             if screw_hole_collection is not None:
+                assert screw_hole_body_collection is not None
+                assert screw_hole_body_scaled_collection is not None
                 screw_hole_collection = rotate(self.parameters.tilt, [1, 0, 0]) ( screw_hole_collection )
                 screw_hole_body_collection = rotate(self.parameters.tilt, [1, 0, 0]) ( screw_hole_body_collection )
                 screw_hole_body_scaled_collection = rotate(self.parameters.tilt, [1, 0, 0]) ( screw_hole_body_scaled_collection )
@@ -413,6 +429,7 @@ class Keyboard():
 
         # bottom_assembly += self.body.bottom_cover()
         # bottom_assembly += body_block
+        assert self.body is not None
         bottom_assembly += self.body.bottom_cover() * body_block
         if self.desired_section_number > -1:
             bottom_assembly *= bottom_section_inclusion
@@ -475,7 +492,7 @@ class Keyboard():
     #         return union()
 
 
-    def split_keyboard(self):
+    def split_keyboard(self) -> None:
         
 
         (min_x, max_x, max_y, min_y) = self.switch_collection.get_collection_bounds()
@@ -513,11 +530,11 @@ class Keyboard():
                 self.support_section_list[section].add_item(x, y, self.support_collection.get_item(x, y))
                 self.support_cutout_section_list[section].add_item(x, y, self.support_cutout_collection.get_item(x, y))
 
-        for section in self.switch_section_list:
-            section.set_collection_neighbors()
+        for section_collection in self.switch_section_list:
+            section_collection.set_collection_neighbors()
 
     @staticmethod
-    def _assign_x_sections(columns, threshold, left_margin):
+    def _assign_x_sections(columns: list[tuple[float, list[float]]], threshold: float, left_margin: float) -> list[list[int]]:
         # Decide which printable x-section each key belongs to, working purely in
         # millimetres so the logic can be unit tested without a Keyboard.
         #
@@ -535,7 +552,7 @@ class Keyboard():
         current_x_start = 0.0
         current_section = 0
         next_section = 0
-        section_start = {}
+        section_start: dict = {}
         assignments = []
         for x_start_mm, x_ends in columns:
             column_sections = []
@@ -557,11 +574,11 @@ class Keyboard():
         return assignments
 
     @staticmethod
-    def _count_sections(assignments):
+    def _count_sections(assignments: list[list[int]]) -> int:
         return max((s for column in assignments for s in column), default=-1) + 1
 
     @staticmethod
-    def _balanced_x_sections(columns, x_build_size, left_margin):
+    def _balanced_x_sections(columns: list[tuple[float, list[float]]], x_build_size: float, left_margin: float) -> list[list[int]]:
         # Packing greedily up to the full plate width uses the fewest sections but
         # fills each to the brim, leaving a thin remainder (e.g. a 27.75u board on a
         # 300mm plate splits 11.5u / 15.25u / 2u). Section count is monotonic in the
@@ -589,21 +606,22 @@ class Keyboard():
             return Keyboard._assign_x_sections(columns, x_build_size, left_margin)
         return assignments
 
-    def get_top_section_remove_block(self, section_number):
+    def get_top_section_remove_block(self, section_number: int) -> OpenSCADObject:
         self.logger.debug('Get Section %d', section_number)
+        assert self.parameters.case_height_base_removed is not None
         remove_block_height = self.parameters.case_height_base_removed * 4
         remove_block_z_offset = remove_block_height / 2
         return self.get_section_x_clip(section_number, remove_block_height, remove_block_z_offset)
 
     @staticmethod
-    def _iter_collection_items(collection):
+    def _iter_collection_items(collection: ItemCollection) -> Iterator[Any]:
         for rx in collection.get_rx_list():
             for ry in collection.get_ry_list_in_rx(rx):
                 for x in collection.get_x_list_in_rx_ry(rx, ry):
                     for y in collection.get_y_list_in_rx_ry_x(x, rx, ry):
                         yield collection.get_item(x, y, rx, ry)
 
-    def _board_y_band_edges(self):
+    def _board_y_band_edges(self) -> list[float]:
         # Every distinct row edge across the whole board (plus the top/bottom
         # margins), so a section's clip and its neighbour's clip sweep the exact
         # same y-bands and their shared seam lines up band for band.
@@ -619,7 +637,7 @@ class Keyboard():
                     edges.add(edge)
         return sorted(edges)
 
-    def _section_x_boundaries(self):
+    def _section_x_boundaries(self) -> list[float]:
         # Nominal straight seam x (mm) for each boundary between section i and
         # i+1 (one per adjacent pair). Placed at the centre of the gap between the
         # two sections' keys and clamped so neither section's plate can exceed
@@ -655,7 +673,7 @@ class Keyboard():
             boundaries.append(seam)
         return boundaries
 
-    def _section_seam_x(self, boundary_index, boundaries, mid_y):
+    def _section_seam_x(self, boundary_index: int, boundaries: list[float], mid_y: float) -> float:
         # Shared seam x (mm) for the boundary between section boundary_index and
         # boundary_index+1 at row-midpoint mid_y (units). Starts from the nominal
         # straight seam and is routed so it never cuts a key on this row: pushed
@@ -691,7 +709,7 @@ class Keyboard():
             seam = min(seam, right_limit)
         return seam
 
-    def get_section_x_clip(self, section_number, remove_block_height, remove_block_z_offset):
+    def get_section_x_clip(self, section_number: int, remove_block_height: float, remove_block_z_offset: float) -> OpenSCADObject:
         # Carve one section out of the whole plate. Adjacent sections share a
         # single seam line (per y-band) - this section keeps the plate to the left
         # of its right seam and to the right of its left seam, and its neighbour
@@ -728,7 +746,7 @@ class Keyboard():
         return clip
 
     
-    def get_bottom_section_remove_block(self, section_number):
+    def get_bottom_section_remove_block(self, section_number: int) -> OpenSCADObject:
         
         
         # section = self.switch_section_list[section_number]
@@ -738,6 +756,7 @@ class Keyboard():
         self.logger.debug('real_case_width: %f', self.parameters.real_case_width)
         self.logger.debug('real_case_height: %f', self.parameters.real_case_height)
 
+        assert self.parameters.bottom_section_count is not None
         section_size = self.parameters.real_case_width / self.parameters.bottom_section_count
 
         self.logger.debug('section_size: %f', section_size)
@@ -749,6 +768,7 @@ class Keyboard():
 
         x_offset = start_x - self.parameters.right_margin
         y_offset = self.parameters.real_case_height / 2 + self.parameters.real_case_height
+        assert self.parameters.case_height_extra_fill is not None
         z_offset = self.parameters.case_height_extra_fill / 2
 
 
@@ -762,8 +782,9 @@ class Keyboard():
 
 
 
-    def get_screw_support_interference_offset(self, start_x, end_x):
+    def get_screw_support_interference_offset(self, start_x: float, end_x: float) -> tuple[float, float]:
 
+        assert self.body is not None
         for coord_string in self.body.screw_hole_info.keys():
             screw_hole_info = self.body.screw_hole_info[coord_string]
 
@@ -807,14 +828,14 @@ class Keyboard():
 
 
     
-    def set_section(self, section_number):
+    def set_section(self, section_number: int) -> None:
         self.desired_section_number = section_number
 
-    def get_top_section_count(self):
+    def get_top_section_count(self) -> int:
         return len(self.switch_section_list)
 
 
-    def get_top_section_dimensions(self):
+    def get_top_section_dimensions(self) -> list[tuple[float, float]]:
         # Width and height in mm of each top section's plate. Width is the kept
         # x-extent between the section's left and right shared seams (board edge
         # for the outer sides), taken across every row so a seam that bulges
@@ -842,5 +863,6 @@ class Keyboard():
         return dimensions
 
 
-    def get_bottom_section_count(self):
+    def get_bottom_section_count(self) -> int:
+        assert self.parameters.bottom_section_count is not None
         return self.parameters.bottom_section_count

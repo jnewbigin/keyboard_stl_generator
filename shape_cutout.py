@@ -1,5 +1,6 @@
 from curses.textpad import rectangle
 from solid import *
+from solid import OpenSCADObject
 from solid.utils import *
 
 import logging
@@ -38,7 +39,7 @@ class ShapeCutout(Cell):
     }
 
 
-    def __init__(self, x, y, shape_type, shape_parameters, parameters: Parameters = Parameters()):
+    def __init__(self, x: float, y: float, shape_type: str, shape_parameters: dict, parameters: Parameters = Parameters()) -> None:
         super().__init__(x, y, parameters = parameters)
 
         self.logger = logging.getLogger().getChild(__name__)
@@ -57,25 +58,23 @@ class ShapeCutout(Cell):
         self.solid = self.get_shape_cutout()
 
 
-    def __str__(self):
+    def __str__(self) -> str:
         return 'Switch: ' + super().__str__()
 
-    def __repr__(self):
-        global_neighbors_json = self.neighbors_formatted(self.global_neighbors, indent=4, current_indent=10)
-        local_neighbors_json = self.neighbors_formatted(self.local_neighbors, indent=4, current_indent=10)
-        return 'Switch: ' + super().__str__() + '\nglobal neighbors: \n' + global_neighbors_json + '\nlocal neighbors: \n' + local_neighbors_json
+    def __repr__(self) -> str:
+        return 'Switch: ' + super().__str__()
 
 
-    def get_shape_cutout(self):
+    def get_shape_cutout(self) -> OpenSCADObject:
         shape = self.shape_type_function_dict[self.shape_type]()
 
         return linear_extrude(height = 10, center = True)(shape)
 
 
-    def get_moved(self):
+    def get_moved(self) -> OpenSCADObject:
         return right(self.x) ( forward(self.y) ( self.solid ) )
     
-    def circle_cutout(self):
+    def circle_cutout(self) -> OpenSCADObject:
         this_function_name = sys._getframe().f_code.co_name
         self.logger = self.logger.getChild(this_function_name)
 
@@ -89,7 +88,7 @@ class ShapeCutout(Cell):
 
         return circle(r = radius)
 
-    def rectangle_cutout(self):
+    def rectangle_cutout(self) -> OpenSCADObject:
         this_function_name = sys._getframe().f_code.co_name
         self.logger = self.logger.getChild(this_function_name)
 
@@ -116,7 +115,7 @@ class ShapeCutout(Cell):
 
         return square([width, height])
 
-    def polygon_cutout(self):
+    def polygon_cutout(self) -> OpenSCADObject:
         this_function_name = sys._getframe().f_code.co_name
         self.logger = self.logger.getChild(this_function_name)
 

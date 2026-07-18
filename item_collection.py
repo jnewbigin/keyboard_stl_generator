@@ -1,5 +1,9 @@
+from collections.abc import KeysView
 from fileinput import close
+from pathlib import Path
+from typing import cast
 from solid import *
+from solid import OpenSCADObject
 from solid.utils import *
 
 # import graphviz
@@ -14,11 +18,11 @@ from cell import Cell
 
 
 class ItemCollection:
-    def __init__(self, rotation = 0.0):
+    def __init__(self, rotation: float = 0.0) -> None:
         
         self.logger = logging.getLogger().getChild(__name__)
 
-        self.collection = {}
+        self.collection: dict = {}
 
         self.rotation = rotation
 
@@ -29,10 +33,10 @@ class ItemCollection:
         # self.dot = graphviz.Digraph()
 
 
-    def get_collection_dict(self, rx = 0.0, ry = 0.0):
+    def get_collection_dict(self, rx: float = 0.0, ry: float = 0.0) -> dict:
         return self.collection[rx][ry]
-    
-    def add_item(self, x_offset, y_offset, cell: Cell, rx = 0.0, ry = 0.0):
+
+    def add_item(self, x_offset: float, y_offset: float, cell: Cell, rx: float = 0.0, ry: float = 0.0) -> None:
         if rx not in self.collection.keys():
             self.collection[rx] = {}
 
@@ -48,10 +52,10 @@ class ItemCollection:
         self.collection[rx][ry][x_offset][y_offset] = cell
 
 
-    def get_item(self, x_offset, y_offset, rx = 0.0, ry = 0.0) -> Cell:
+    def get_item(self, x_offset: float, y_offset: float, rx: float = 0.0, ry: float = 0.0) -> Cell:
         return self.collection[rx][ry][x_offset][y_offset]
 
-    def get_item_with_value(self, value):
+    def get_item_with_value(self, value: str) -> Cell | None:
         for rx in self.get_rx_list():
             for ry in self.get_ry_list_in_rx(rx):
                 for x in self.get_x_list_in_rx_ry(rx, ry):
@@ -61,10 +65,12 @@ class ItemCollection:
                         if current_switch.cell_value == value:
                             return current_switch
 
-    def get_moved_item(self, x_offset, y_offset, rx = 0.0, ry = 0.0) -> Cell:
+        return None
+
+    def get_moved_item(self, x_offset: float, y_offset: float, rx: float = 0.0, ry: float = 0.0) -> OpenSCADObject:
         return self.collection[rx][ry][x_offset][y_offset].get_moved()
 
-    def collection_has_keys(self, rx = 0.0, ry = None, x = None, y = None):
+    def collection_has_keys(self, rx: float = 0.0, ry: float | None = None, x: float | None = None, y: float | None = None) -> bool:
         if rx not in self.collection.keys():
             self.logger.debug('Collection has no rx = {}'.format(rx))
             return False
@@ -80,46 +86,46 @@ class ItemCollection:
         
         return True
 
-    def get_rx_list(self):
+    def get_rx_list(self) -> KeysView:
         return self.collection.keys()
 
-    def get_ry_list_in_rx(self, rx):
+    def get_ry_list_in_rx(self, rx: float) -> KeysView | list:
         if self.collection_has_keys(rx):
             return self.collection[rx].keys()
         else:
             return []
 
-    def get_x_list_in_rx_ry(self, rx = 0.0, ry = 0.0):
+    def get_x_list_in_rx_ry(self, rx: float = 0.0, ry: float = 0.0) -> KeysView | list:
         if self.collection_has_keys(rx, ry):
             return self.collection[rx][ry].keys()
         else:
             return []
-    def get_y_list_in_rx_ry_x(self, x, rx = 0.0, ry = 0.0):
+    def get_y_list_in_rx_ry_x(self, x: float, rx: float = 0.0, ry: float = 0.0) -> KeysView | list:
         if self.collection_has_keys(rx, ry, x):
             return self.collection[rx][ry][x].keys()
         else:
             return []
 
-    def get_x_list(self, rx = 0.0, ry = 0.0):
+    def get_x_list(self, rx: float = 0.0, ry: float = 0.0) -> KeysView | list:
         return self.get_x_list_in_rx_ry(rx, ry)
 
 
-    def get_sorted_x_list(self, rx = 0.0, ry = 0.0):
+    def get_sorted_x_list(self, rx: float = 0.0, ry: float = 0.0) -> list:
         return sorted(self.get_x_list(rx, ry))
 
-    def get_y_list_in_x(self, x, rx = 0.0, ry = 0.0):
+    def get_y_list_in_x(self, x: float, rx: float = 0.0, ry: float = 0.0) -> KeysView | list:
         return self.get_y_list_in_rx_ry_x(x, rx, ry)
 
-    def get_sorted_y_list_in_x(self, x, rx = 0.0, ry = 0.0):
+    def get_sorted_y_list_in_x(self, x: float, rx: float = 0.0, ry: float = 0.0) -> list:
         return sorted(self.get_y_list_in_x(x, rx, ry))
 
-    def get_min_x(self, rx = 0.0, ry = 0.0):
+    def get_min_x(self, rx: float = 0.0, ry: float = 0.0) -> float:
         return min(self.get_x_list(rx, ry))
 
-    def get_max_x(self, rx = 0.0, ry = 0.0):
+    def get_max_x(self, rx: float = 0.0, ry: float = 0.0) -> float:
         return max(self.get_x_list(rx, ry))
-        
-    def get_min_y(self, rx = 0.0, ry = 0.0):
+
+    def get_min_y(self, rx: float = 0.0, ry: float = 0.0) -> float:
         min_y = 0
         
         for x in self.get_x_list(rx, ry):
@@ -129,7 +135,7 @@ class ItemCollection:
                 min_y = col_min_y    
         return min_y
 
-    def get_collection_bounds(self, rx = 0.0, ry = 0.0) -> float:
+    def get_collection_bounds(self, rx: float = 0.0, ry: float = 0.0) -> tuple[float, float, float, float]:
         
 
         min_y = 1000.0
@@ -162,7 +168,7 @@ class ItemCollection:
         return (min_x, max_x, max_y, min_y)
 
 
-    def get_moved_union(self, rx = 0.0, ry = 0.0):
+    def get_moved_union(self, rx: float = 0.0, ry: float = 0.0) -> OpenSCADObject:
         solid = union()
 
         for x in self.get_x_list_in_rx_ry(rx, ry):
@@ -172,7 +178,7 @@ class ItemCollection:
         return solid
 
     
-    def set_collection_neighbors(self, neighbor_group = 'local'):
+    def set_collection_neighbors(self, neighbor_group: str = 'local') -> None:
         
 
         self.logger.debug('Set %s neighbors', neighbor_group)
@@ -180,8 +186,7 @@ class ItemCollection:
             for ry in self.get_ry_list_in_rx(rx):
                 for x in self.get_x_list_in_rx_ry(rx, ry):
                     for y in self.get_y_list_in_rx_ry_x(x, rx, ry):
-                        current_switch: Switch
-                        current_switch = self.get_item(x, y, rx, ry)
+                        current_switch = cast(Switch, self.get_item(x, y, rx, ry))
                         all_neighbors_set = current_switch.get_all_neighbors_set(neighbor_group = neighbor_group)
                         if all_neighbors_set == False:
                             # self.logger.debug('set_collection_neighbors call set_item_neighbor for switch %s', str(current_switch))
@@ -189,7 +194,7 @@ class ItemCollection:
 
     
     
-    def set_item_neighbor(self, item: Switch, neighbor_group = 'local', tabs = ''):
+    def set_item_neighbor(self, item: Switch, neighbor_group: str = 'local', tabs: str = '') -> None:
         # self.logger.debug('%sSet neighbors for switch %s', tabs, str(item))
         
         x_min = item.x
@@ -197,7 +202,7 @@ class ItemCollection:
         y_min = item.y - item.h
         y_max = item.y
 
-        neighbor_list_dict = {
+        neighbor_list_dict: dict[str, list[Switch]] = {
             'right': [],
             'left': [],
             'top': [],
@@ -216,7 +221,7 @@ class ItemCollection:
             for sib_ry in self.get_ry_list_in_rx(sib_rx):
                 for sib_x in self.get_x_list_in_rx_ry(sib_rx, sib_ry):
                     for sib_y in self.get_y_list_in_rx_ry_x(sib_x, sib_rx, sib_ry):
-                        sibling_switch = self.get_item(sib_x, sib_y, sib_rx, sib_ry)
+                        sibling_switch = cast(Switch, self.get_item(sib_x, sib_y, sib_rx, sib_ry))
 
                         sib_x_min = sibling_switch.x
                         sib_x_max = sibling_switch.x + sibling_switch.w
@@ -245,8 +250,8 @@ class ItemCollection:
             # self.logger.debug('direction: %s', direction)
             offset = 0.0
             
-            if len(neighbor_list_dict[direction]) > 0: 
-                closest_neighbor: Switch = None
+            if len(neighbor_list_dict[direction]) > 0:
+                closest_neighbor: Switch | None = None
 
                 if direction == 'right':
                     closest_neighbor = min(neighbor_list_dict[direction], key=lambda item: item.x)
@@ -265,6 +270,7 @@ class ItemCollection:
                     offset = y_min - closest_neighbor.y_max
                     perp_offset = closest_neighbor.x - item.x
 
+                assert closest_neighbor is not None
                 item.set_neighbor(neighbor = closest_neighbor, neighbor_name = direction, offset = offset, neighbor_group = neighbor_group, perp_offset = perp_offset)
                 closest_neighbor.set_neighbor(neighbor = item, neighbor_name = Switch.NEIGHBOR_OPOSITE_DICT[direction], offset = offset, neighbor_group = neighbor_group, perp_offset = perp_offset)
                 closest_neighbor.update_all_neighbors_set(neighbor_group = neighbor_group)
@@ -282,7 +288,7 @@ class ItemCollection:
 
         if all_neighbors_set == True:
             for direction in neighbor_list_dict.keys():
-                neighbor: Switch
+                neighbor: Switch | None
                 neighbor = item.get_neighbor(direction, neighbor_group = neighbor_group)
 
                 if neighbor is not None:
@@ -298,7 +304,7 @@ class ItemCollection:
 
 
 
-    def draw_rotated_items(self, rx = 0.0, ry = 0.0):
+    def draw_rotated_items(self, rx: float = 0.0, ry: float = 0.0) -> OpenSCADObject:
         solid = union()
 
         for x in self.get_x_list_in_rx_ry(rx, ry):
@@ -316,7 +322,7 @@ class ItemCollection:
 
 
 
-    def render_graph(self, output_filename):
+    def render_graph(self, output_filename: Path) -> None:
         
 
         # self.dot.render(output_filename, engine = 'neato')
@@ -328,7 +334,7 @@ class ItemCollection:
         # self.dot_recurse.render(path / filename, engine = 'neato')
 
 
-    def neighbor_check(self, neighbor_group = 'local', output_filename = ''):
+    def neighbor_check(self, neighbor_group: str = 'local', output_filename: str = '') -> None:
         
         
         # self.dot = graphviz.Digraph(comment='Keyboard')
@@ -336,8 +342,7 @@ class ItemCollection:
             for ry in self.get_ry_list_in_rx(rx):
                 for x in self.get_x_list_in_rx_ry(rx, ry):
                     for y in self.get_y_list_in_rx_ry_x(x, rx, ry):
-                        item: Switch
-                        item = self.get_item(x, y, rx, ry)
+                        item = cast(Switch, self.get_item(x, y, rx, ry))
 
                         item_cell_value = item.cell_value
 
@@ -346,7 +351,7 @@ class ItemCollection:
 
                         for direction in item.get_neighbor_direction_list():
                             reverse_direction = Switch.NEIGHBOR_OPOSITE_DICT[direction]
-                            neighbor: Switch = item.get_neighbor(direction, neighbor_group = neighbor_group)
+                            neighbor: Switch | None = item.get_neighbor(direction, neighbor_group = neighbor_group)
 
                             if neighbor is not None:
                                 neighbor_cell_value = neighbor.cell_value
@@ -354,7 +359,7 @@ class ItemCollection:
                                 # self.dot.node(neighbor_cell_value, pos = pos)
                                 # self.dot.edge(item_cell_value, neighbor_cell_value)
 
-                                reverse_neighbor: Switch = neighbor.get_neighbor(reverse_direction, neighbor_group = neighbor_group)
+                                reverse_neighbor = cast(Switch, neighbor.get_neighbor(reverse_direction, neighbor_group = neighbor_group))
 
                                 reverse_neighbor_cell_value = reverse_neighbor.cell_value
 
@@ -363,13 +368,12 @@ class ItemCollection:
         
         # self.dot.render(output_filename, engine = 'neato')
 
-    def has_global_neighbor_section(self, neighbor_name = ''):
+    def has_global_neighbor_section(self, neighbor_name: str = '') -> bool | None:
         for rx in self.get_rx_list():
             for ry in self.get_ry_list_in_rx(rx):
                 for x in self.get_x_list_in_rx_ry(rx, ry):
                     for y in self.get_y_list_in_rx_ry_x(x, rx, ry):
-                        item: Switch
-                        item = self.get_item(x, y, rx, ry)
+                        item = cast(Switch, self.get_item(x, y, rx, ry))
 
                         local_neighbor = item.get_neighbor(neighbor_name, neighbor_group = 'local')
                         global_neighbor = item.get_neighbor(neighbor_name, neighbor_group = 'global')
@@ -377,9 +381,11 @@ class ItemCollection:
                         if local_neighbor is None and global_neighbor is not None:
                             return True
 
+        return None
 
-    def has_global_right_neighbor_section(self):
+
+    def has_global_right_neighbor_section(self) -> bool | None:
         return self.has_global_neighbor_section(neighbor_name = 'right')
-    
-    def has_global_left_neighbor_section(self):
+
+    def has_global_left_neighbor_section(self) -> bool | None:
         return self.has_global_neighbor_section(neighbor_name = 'left')

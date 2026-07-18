@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 import argparse
-from asyncio import subprocess
+from collections.abc import Sequence
+from typing import Any
 import json
 import json5
 # import math
@@ -65,9 +66,10 @@ logger.addHandler(file_handler)
 
 
 # Helper for parser to wnsure filename argument has to correct extension
-def CheckExt(choices):
+def CheckExt(choices: set[str]) -> type[argparse.Action]:
     class Act(argparse.Action):
-        def __call__(self,parser,namespace,fname,option_string=None):
+        def __call__(self, parser: argparse.ArgumentParser, namespace: argparse.Namespace, fname: str | Sequence[Any] | None, option_string: str | None = None) -> None:
+            assert isinstance(fname, str)
             ext = os.path.splitext(fname)[1][1:]
             if ext not in choices:
                 option_string = '({})'.format(option_string) if option_string else ''
@@ -79,7 +81,7 @@ def CheckExt(choices):
 
 
 
-def main():
+def main() -> None:
 
     parser = argparse.ArgumentParser(description='Build custom keyboard SCAD file using keyboard layout editor format')
     parser.add_argument('-i', '--input-file', metavar = 'layout_json_file_name.json', help = 'A path to a keyboard layout editor json file', required = True, action=CheckExt({'json'}))
@@ -238,7 +240,7 @@ def main():
     logger.debug('kerf: %f', keyboard.kerf)
 
     # Dictionary of SolidPython solid objects that need to be rendered to SCAD and to STL if desired
-    solid_object_dict = {}
+    solid_object_dict: dict = {}
 
     # Create objects for each of the generated sections
     if args.all_sections == True:
@@ -334,10 +336,10 @@ def main():
     ############################################################
     # Render SCAD and STL files
     ############################################################
-    subprocess_dict = {}
+    subprocess_dict: dict[str, subprocess.Popen | None] = {}
 
     # Per-part lists of the section scad files, used to build assembly views.
-    assembly_includes = {}
+    assembly_includes: dict = {}
 
     switch_type_for_filename = ''
     stab_type_for_filename = ''

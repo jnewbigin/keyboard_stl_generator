@@ -13,7 +13,7 @@ class Parameters():
 
     # SWITCH_SPACING = 19.05
 
-    def __init__(self, parameter_dict: dict = None):
+    def __init__(self, parameter_dict: dict | None = None) -> None:
 
         self.logger = logging.getLogger(__name__)
 
@@ -85,17 +85,17 @@ class Parameters():
 
         # Custom Switch Cutout Attributes
         self.custom_shape = False
-        self.custom_shape_points = None
-        self.custom_shape_path = None
+        self.custom_shape_points: list | None = None
+        self.custom_shape_path: list | None = None
 
         self.plate_supports = True
         self.support_bar_height = 3.0
         self.support_bar_width = 3.0
 
-        self.top_margin = 10
-        self.bottom_margin = 10
-        self.left_margin = 10
-        self.right_margin = 10
+        self.top_margin = 10.0
+        self.bottom_margin = 10.0
+        self.left_margin = 10.0
+        self.right_margin = 10.0
 
         self.case_height = 18
         self.case_wall_thickness = 3.0
@@ -109,13 +109,13 @@ class Parameters():
         self.screw_count = 4
         self.screw_diameter = 4
         self.screw_edge_inset = 7
-        self.screw_edge_x_inset = None
-        self.screw_edge_y_inset = None
+        self.screw_edge_x_inset: float | None = None
+        self.screw_edge_y_inset: float | None = None
         self.screw_hole_body_wall_width = 2
         self.screw_hole_body_support_x_factor = 4
 
         self.custom_screw_hole_coordinates_origin = [0, 0]
-        self.custom_screw_hole_coordinates = None
+        self.custom_screw_hole_coordinates: list | None = None
 
         self.cable_hole = False
         self.cable_diameter = 4
@@ -124,18 +124,18 @@ class Parameters():
         self.cable_hole_up_offset = 1
         self.cable_hole_down_offset = 1
 
-        self.custom_polygons = None
+        self.custom_polygons: list | None = None
 
-        self.custom_pcb = None
-        self.pcb_width = None
-        self.pcb_height = None
-        self.pcb_top_left_coordinates = None
-        self.pcb_left_switch_center_x_coordinate = None
-        self.pcb_top_switch_center_y_coordinate = None
-        self.pcb_case_top_margin = None
-        self.pcb_case_bottom_margin = None
-        self.pcb_case_right_margin = None
-        self.pcb_case_left_margin = None
+        self.custom_pcb: bool | None = None
+        self.pcb_width: float | None = None
+        self.pcb_height: float | None = None
+        self.pcb_top_left_coordinates: list | None = None
+        self.pcb_left_switch_center_x_coordinate: float | None = None
+        self.pcb_top_switch_center_y_coordinate: float | None = None
+        self.pcb_case_top_margin: float | None = None
+        self.pcb_case_bottom_margin: float | None = None
+        self.pcb_case_right_margin: float | None = None
+        self.pcb_case_left_margin: float | None = None
 
         self.test_block = False
         self.test_block_x_start = 0
@@ -145,7 +145,7 @@ class Parameters():
         self.test_block_z_start = 0
         self.test_block_z_end = 0
 
-        self.switch_config = None
+        self.switch_config: SwitchConfig | None = None
 
         self.min_x = 0.0
         self.max_x = 0.0
@@ -160,24 +160,24 @@ class Parameters():
         self.case_height_extra = 50
 
         # Calculated attributes
-        self.case_height_base_removed = None
-        self.case_height_extra_fill = None
-        self.side_margin_diff = None
-        self.top_margin_diff = None
-        self.screw_tap_hole_diameter = None
-        self.screw_hole_body_diameter = None
-        self.screw_hole_body_radius = None
-        self.x_screw_width = None
-        self.y_screw_width = None
-        self.bottom_section_count = None
-        self.screw_hole_body_support_end_x = None
+        self.case_height_base_removed: float | None = None
+        self.case_height_extra_fill: float | None = None
+        self.side_margin_diff: float | None = None
+        self.top_margin_diff: float | None = None
+        self.screw_tap_hole_diameter: float | None = None
+        self.screw_hole_body_diameter: float | None = None
+        self.screw_hole_body_radius: float | None = None
+        self.x_screw_width: float | None = None
+        self.y_screw_width: float | None = None
+        self.bottom_section_count: int | None = None
+        self.screw_hole_body_support_end_x: float | None = None
 
         if self.parameter_dict is not None:
             self.build_attr_from_dict(self.parameter_dict)
 
         # self.validate_parameters()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         output = 'Parameters:\n'
         ignore_attr_names = [
             'logger', 'parameter_dict', 'switch_config',
@@ -196,10 +196,10 @@ class Parameters():
 
         return output
 
-    def U(self, u_value):
+    def U(self, u_value: float) -> float:
         return u_value * self.switch_spacing
 
-    def update_calculated_attributes(self):
+    def update_calculated_attributes(self) -> None:
         # Calculated attributes
         if self.screw_edge_x_inset is None:
             self.screw_edge_x_inset = self.screw_edge_inset
@@ -219,7 +219,7 @@ class Parameters():
         self.screw_hole_body_support_end_x = (
                                                          self.case_height_extra_fill / self.screw_hole_body_support_x_factor) + self.screw_hole_body_radius
 
-    def set_dimensions(self, max_x, min_y, min_x, max_y):
+    def set_dimensions(self, max_x: float, min_y: float, min_x: float, max_y: float) -> None:
 
         self.max_x = max_x
         self.max_x = max_x
@@ -249,6 +249,16 @@ class Parameters():
             if self.pcb_top_left_coordinates is not None:
                 pcb_x_coordinate = self.pcb_top_left_coordinates[0]
                 pcb_y_coordinate = self.pcb_top_left_coordinates[1]
+
+            # A custom PCB requires all of these to be supplied in the config.
+            assert self.pcb_width is not None
+            assert self.pcb_height is not None
+            assert self.pcb_left_switch_center_x_coordinate is not None
+            assert self.pcb_top_switch_center_y_coordinate is not None
+            assert self.pcb_case_left_margin is not None
+            assert self.pcb_case_right_margin is not None
+            assert self.pcb_case_top_margin is not None
+            assert self.pcb_case_bottom_margin is not None
 
             # Get the x any y coordinates of the top reference switch and left reference switch
             left_switch_left_x_coordinate = self.pcb_left_switch_center_x_coordinate - half_u
@@ -282,7 +292,7 @@ class Parameters():
 
         self.update_calculated_attributes()
 
-    def build_attr_from_dict(self, parameter_dict):
+    def build_attr_from_dict(self, parameter_dict: dict) -> None:
 
         for param in parameter_dict.keys():
             ignore_deprecated = False
@@ -324,7 +334,7 @@ class Parameters():
 
         self.validate_parameters()
 
-    def set_parameter_dict(self, parameter_dict):
+    def set_parameter_dict(self, parameter_dict: dict) -> None:
         self.parameter_dict = parameter_dict
         self.build_attr_from_dict(self.parameter_dict)
 
@@ -337,7 +347,8 @@ class Parameters():
     #     else:
     #         raise ValueError('No paramter exists with name %s' % (paramaeter_name))
 
-    def validate_parameters(self):
+    def validate_parameters(self) -> None:
+        assert self.switch_config is not None
         parameter_error = False
         error_message = ''
         # if self.screw_edge_inset < self.case_wall_thickness + self.screw_hole_body_radius:

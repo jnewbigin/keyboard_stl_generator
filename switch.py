@@ -1,8 +1,10 @@
 from solid import *
+from solid import OpenSCADObject
 from solid.utils import *
 
 import logging
 import sys
+from typing import Any
 
 from cell import Cell
 from parameters import Parameters
@@ -76,7 +78,7 @@ class Switch(Cell):
     }
 
 
-    def __init__(self, x, y, w, h, rotation = 0.0,  r_x_offset = 0.0, r_y_offset = 0.0, z_offset = 0.0, cell_value = '', switch_config = None, parameters: Parameters = Parameters()):
+    def __init__(self, x: float, y: float, w: float, h: float, rotation: float = 0.0,  r_x_offset: float = 0.0, r_y_offset: float = 0.0, z_offset: float = 0.0, cell_value: str = '', switch_config: SwitchConfig | None = None, parameters: Parameters = Parameters()) -> None:
         super().__init__(x, y, w, h, rotation,  r_x_offset, r_y_offset, z_offset = z_offset, cell_value = cell_value, parameters = parameters)
 
         self.logger = logging.getLogger().getChild(__name__)
@@ -91,7 +93,7 @@ class Switch(Cell):
 
         self.logger.debug('x: %f, y: %f, w: %f, h: %f, end_x: %f, end_y: %f', self.x, self.y, self.w, self.h, self.end_x, self.end_y) 
 
-        self.global_neighbors = {
+        self.global_neighbors: dict[str, Any] = {
             'right': {
             },
             'left': {
@@ -103,7 +105,7 @@ class Switch(Cell):
             'neighbor_check_complete': False
         }
 
-        self.local_neighbors = {
+        self.local_neighbors: dict[str, Any] = {
             'right': {
             },
             'left': {
@@ -123,7 +125,7 @@ class Switch(Cell):
         # self.neighbors
     
 
-    def neighbors_formatted(self, obj, indent = 2, current_indent = 0):
+    def neighbors_formatted(self, obj: Any, indent: int = 2, current_indent: int = 0) -> str:
         current_output = ''
         current_indent_str = ' ' * current_indent
         if isinstance(obj, dict):
@@ -151,16 +153,16 @@ class Switch(Cell):
         return current_output
 
 
-    def __str__(self):
+    def __str__(self) -> str:
         return 'Switch: ' + super().__str__()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         global_neighbors_json = self.neighbors_formatted(self.global_neighbors, indent=4, current_indent=10)
         local_neighbors_json = self.neighbors_formatted(self.local_neighbors, indent=4, current_indent=10)
         return 'Switch: ' + super().__str__() + '\nglobal neighbors: \n' + global_neighbors_json + '\nlocal neighbors: \n' + local_neighbors_json
 
 
-    def switch_cutout(self):
+    def switch_cutout(self) -> OpenSCADObject:
         """
         Return the polygon that will be used to cutout a place in the plate for a switch
 
@@ -170,12 +172,14 @@ class Switch(Cell):
             The OpenSCADObject for the cutout
         """
 
+        assert self.switch_config is not None
         self.logger.debug('switch %s, switch type: %s, stab type: %s', self.cell_value, self.switch_config.switch_type, self.switch_config.stabilizer_type)
-        
+
         # switch_poly_points, switch_poly_path = self.switch_config.get_switch_poly_info()
         # stab_poly_points, stab_poly_path = self.switch_config.get_stab_poly_info(key_width = self.switch_length)
 
         switch_poly_points = self.switch_config.get_switch_poly_info()
+        assert switch_poly_points is not None
         switch_poly_path = [range(len(switch_poly_points))]
 
         stab_poly_points, *support_cutout_poly_points = self.switch_config.get_stab_poly_info(key_width = self.switch_length)
@@ -266,7 +270,7 @@ class Switch(Cell):
 
 
 
-    def update_all_neighbors_set(self, neighbor_group = 'local'):
+    def update_all_neighbors_set(self, neighbor_group: str = 'local') -> None:
 
         if neighbor_group == 'local':
             neighbor_dict = self.local_neighbors
@@ -283,7 +287,7 @@ class Switch(Cell):
         neighbor_dict['neighbor_check_complete'] = all_neighbors_set
 
 
-    def get_all_neighbors_set(self, neighbor_group = 'local'):
+    def get_all_neighbors_set(self, neighbor_group: str = 'local') -> bool:
 
         if neighbor_group == 'local':
             neighbor_dict = self.local_neighbors
@@ -293,7 +297,7 @@ class Switch(Cell):
         return neighbor_dict['neighbor_check_complete']
 
 
-    def get_neighbor(self, neighbor_name, neighbor_group = 'local'):
+    def get_neighbor(self, neighbor_name: str, neighbor_group: str = 'local') -> 'Switch | None':
         
         neighbor = None
 
@@ -304,7 +308,7 @@ class Switch(Cell):
 
         return neighbor
 
-    def set_neighbor(self, neighbor = None, neighbor_name = '', offset = 0.0, has_neighbor = True, neighbor_group = 'local', perp_offset = 0.0):
+    def set_neighbor(self, neighbor: 'Switch | None' = None, neighbor_name: str = '', offset: float = 0.0, has_neighbor: bool = True, neighbor_group: str = 'local', perp_offset: float = 0.0) -> None:
         
         temp_dict = {
             'has_neighbor': has_neighbor,
@@ -330,25 +334,25 @@ class Switch(Cell):
     # def set_bottom_neighbor(self, neighbor = None, offset = 0.0, has_neighbor = True, neighbor_group = 'local', perp_offset = 0.0):
     #     self.set_neighbor(neighbor, 'bottom', offset, has_neighbor, neighbor_group, perp_offset)
 
-    def has_neighbor(self, neighbor_name = '', neighbor_group = 'local'):
+    def has_neighbor(self, neighbor_name: str = '', neighbor_group: str = 'local') -> bool:
         if neighbor_group == 'local':
             return self.local_neighbors[neighbor_name]['has_neighbor']
-        elif neighbor_group == 'global':
+        else:
             return self.global_neighbors[neighbor_name]['has_neighbor']
-    
-    def get_neighbor_offset(self, neighbor_name = '', neighbor_group = 'local'):
+
+    def get_neighbor_offset(self, neighbor_name: str = '', neighbor_group: str = 'local') -> float:
         if neighbor_group == 'local':
             return self.local_neighbors[neighbor_name]['offset']
-        elif neighbor_group == 'global':
+        else:
             return self.global_neighbors[neighbor_name]['offset']
 
-    def get_neighbor_perp_offset(self, neighbor_name = '', neighbor_group = 'local'):
+    def get_neighbor_perp_offset(self, neighbor_name: str = '', neighbor_group: str = 'local') -> float:
         if neighbor_group == 'local':
             return self.local_neighbors[neighbor_name]['perp_offset']
-        elif neighbor_group == 'global':
+        else:
             return self.global_neighbors[neighbor_name]['perp_offset']
 
-    def get_neighbor_direction_list(self):
+    def get_neighbor_direction_list(self) -> list[str]:
 
         name_list = []
 

@@ -1,4 +1,5 @@
 from solid import *
+from solid import OpenSCADObject
 from solid.utils import *
 
 import logging
@@ -8,7 +9,7 @@ from parameters import Parameters
 
 class SupportCutout(Cell):
 
-    def __init__(self, x, y, w, h, plate_thickness, support_bar_height, support_bar_width, rotation = 0.0,  r_x_offset = 0.0, r_y_offset = 0.0, z_offset = 0.0, set_to_origin = False, cell_value = '', parameters: Parameters = Parameters()):
+    def __init__(self, x: float, y: float, w: float, h: float, plate_thickness: float, support_bar_height: float, support_bar_width: float, rotation: float = 0.0,  r_x_offset: float = 0.0, r_y_offset: float = 0.0, z_offset: float = 0.0, set_to_origin: bool = False, cell_value: str = '', parameters: Parameters = Parameters()) -> None:
         super().__init__(x, y, w, h, rotation,  r_x_offset, r_y_offset, z_offset = z_offset, cell_value = cell_value, parameters = parameters)
 
         self.logger = logging.getLogger().getChild(__name__)
@@ -23,10 +24,10 @@ class SupportCutout(Cell):
     # def u(self, u_value):
     #     return u_value * self.SWITCH_SPACING
 
-    def __str__(self):
+    def __str__(self) -> str:
         return 'SupportCutout: ' + super().__str__()
 
-    def support_cutout(self):
+    def support_cutout(self) -> OpenSCADObject:
         # Adjacent support cutouts tile the whole plate edge-to-edge and the
         # cutout top sits flush with the plate bottom. Both produce coplanar
         # coincident faces that leave the unioned/subtracted mesh non-manifold.
