@@ -527,7 +527,26 @@ class Body():
                 },
                 'custom_support_direction': custom_support_direction
             }
-        
+
+
+    def cable_hole_center_x(self) -> float:
+        # Horizontal centre of the cable hole, matching Cable.get_cable_hole().
+        return self.left_margin + (self.real_max_x / 2)
+
+    def screw_clashes_with_cable_hole(self, screw_x: float, screw_y: float) -> bool:
+        # screw_x, screw_y are in the normalised screw grid (0..x_screw_width,
+        # 0..y_screw_width). Only top-edge screws share the back wall with the
+        # cable hole, so lower screws never clash. A top screw sits at real x
+        # screw_x + screw_edge_x_inset once the assembly is placed, the same
+        # frame the cable hole centre is measured in.
+        if self.parameters.cable_hole != True:
+            return False
+        if screw_y != self.y_screw_width:
+            return False
+
+        screw_real_x = screw_x + self.screw_edge_x_inset
+        clearance = (self.parameters.cable_hole_width / 2) + self.screw_hole_body_radius
+        return abs(screw_real_x - self.cable_hole_center_x()) < clearance
 
     def screw_hole_objects(self, tap: bool = False) -> tuple[OpenSCADObject, OpenSCADObject, OpenSCADObject]:
         
@@ -549,9 +568,8 @@ class Body():
             custom_support_direction = self.screw_hole_info[coord_string]['custom_support_direction']
 
             self.logger.debug('coord: %s, self.x_screw_width: %f, self.y_screw_width: %f', str(coord), self.x_screw_width, self.y_screw_width)
-            # Skip the center top screw hole if it is in the top center and the case has a cable hole
-            if self.parameters.cable_hole == True and y == self.y_screw_width and x == self.x_screw_width / 2:
-                # self.logger.debug('coord: %s', str(coord))
+            # Skip any top screw whose body would clash with the cable hole
+            if self.screw_clashes_with_cable_hole(x, y):
                 continue
 
             screw_hole = self.screw_hole(tap = tap)
