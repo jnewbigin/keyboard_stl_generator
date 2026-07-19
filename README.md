@@ -102,6 +102,7 @@ The program can then genarate a number of different items. The entire case can b
     - **screw_edge_inset:** How far in off the edge of the plate should the center of the scre hole be.
   - Cable Hole Parameters
     - **cable_hole:** Generate a hole in the back of the case for a cable. true or false
+    - **cable_hole_x_offset:** Horizontal centre of the cable hole in mm, measured from the left edge of the case. Omit (or null) to centre the hole on the key field.
     - **hole_width:** The width of the screw hole in mm
     - **hole_height:** The height of the screw hole in mm
     - **cable_hole_down_offset:** How far down from the bottom of the plate thickness should the screw hole be placed.

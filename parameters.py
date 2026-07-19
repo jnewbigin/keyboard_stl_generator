@@ -123,6 +123,9 @@ class Parameters():
         self.cable_hole_height = 10
         self.cable_hole_up_offset = 1
         self.cable_hole_down_offset = 1
+        # Horizontal centre of the cable hole in mm from the left case edge.
+        # None keeps the hole centred on the key field.
+        self.cable_hole_x_offset: float | None = None
 
         self.custom_polygons: list | None = None
 
@@ -198,6 +201,13 @@ class Parameters():
 
     def U(self, u_value: float) -> float:
         return u_value * self.switch_spacing
+
+    def cable_hole_center_x(self) -> float:
+        # Real x of the cable hole centre once the assembly is placed (the case
+        # left edge sits at x = 0). Requires set_dimensions to have run.
+        if self.cable_hole_x_offset is not None:
+            return self.cable_hole_x_offset
+        return self.left_margin + (self.real_max_x / 2)
 
     def update_calculated_attributes(self) -> None:
         # Calculated attributes
@@ -292,6 +302,8 @@ class Parameters():
 
         self.update_calculated_attributes()
 
+        self.validate_cable_hole()
+
     def build_attr_from_dict(self, parameter_dict: dict) -> None:
 
         for param in parameter_dict.keys():
@@ -370,6 +382,42 @@ class Parameters():
         if self.stabilizer_type not in self.switch_config.stab_type_function_dict.keys():
             parameter_error = True
             error_message += 'stabilizer type %s is not a valid stabilizer type' % (self.stabilizer_type)
+
+        if parameter_error == True:
+            print('ERROR:', error_message)
+            exit(1)
+
+    def validate_cable_hole(self) -> None:
+        # Runs from set_dimensions, once the real case size is known. The top
+        # piece spans x = 0 .. real_case_width and z = 0 (case floor) up to the
+        # plate underside, so the hole must sit fully inside both.
+        if self.cable_hole != True:
+            return
+
+        assert self.case_height_base_removed is not None
+        parameter_error = False
+        error_message = ''
+
+        if self.cable_hole_width <= 0:
+            parameter_error = True
+            error_message += 'cable_hole_width must be greater than 0\n'
+
+        if self.cable_hole_height <= 0:
+            parameter_error = True
+            error_message += 'cable_hole_height must be greater than 0\n'
+
+        center = self.cable_hole_center_x()
+        half_width = self.cable_hole_width / 2
+        if center - half_width < 0 or center + half_width > self.real_case_width:
+            parameter_error = True
+            error_message += ('cable hole (centre %.2fmm, width %.2fmm) does not fit within the %.2fmm case width\n'
+                              % (center, self.cable_hole_width, self.real_case_width))
+
+        available_height = self.case_height_base_removed - self.plate_thickness - self.cable_hole_down_offset
+        if self.cable_hole_height > available_height:
+            parameter_error = True
+            error_message += ('cable hole (height %.2fmm) does not fit within the %.2fmm available below the plate\n'
+                              % (self.cable_hole_height, available_height))
 
         if parameter_error == True:
             print('ERROR:', error_message)
