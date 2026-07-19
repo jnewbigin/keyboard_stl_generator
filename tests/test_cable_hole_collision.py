@@ -107,9 +107,15 @@ class TestConfigurablePosition:
 
 
 def make_parameters(**overrides):
-    """Parameters with real dimensions set, ready for validate_cable_hole_position."""
+    """Parameters with real dimensions set, ready for validate_cable_hole.
+
+    case_height 18 / bottom_cover 1 / plate 1.111 / down_offset 1 leaves
+    14.889mm below the plate for the hole height.
+    """
     params = dict(left_margin=10, right_margin=10, top_margin=10, bottom_margin=10,
-                  cable_hole=True, cable_hole_width=11)
+                  cable_hole=True, cable_hole_width=11, cable_hole_height=10,
+                  case_height=18, bottom_cover_thickness=1, plate_thickness=1.111,
+                  cable_hole_down_offset=1)
     params.update(overrides)
     parameters = Parameters(params)
     parameters.real_max_x = 300.0
@@ -120,29 +126,54 @@ def make_parameters(**overrides):
     return parameters
 
 
-class TestCableHoleBounds:
+class TestCableHoleWidthBounds:
     def test_centred_hole_is_within_bounds(self):
-        make_parameters().validate_cable_hole_position()  # must not exit
+        make_parameters().validate_cable_hole()  # must not exit
 
     def test_offset_hole_within_bounds_is_accepted(self):
-        make_parameters(cable_hole_x_offset=30).validate_cable_hole_position()
+        make_parameters(cable_hole_x_offset=30).validate_cable_hole()
 
     def test_disabled_cable_hole_is_never_checked(self):
-        # An impossible offset is ignored when there is no cable hole.
-        make_parameters(cable_hole=False, cable_hole_x_offset=9999).validate_cable_hole_position()
+        # Impossible size/offset is ignored when there is no cable hole.
+        make_parameters(cable_hole=False, cable_hole_x_offset=9999, cable_hole_height=9999).validate_cable_hole()
 
     def test_offset_past_right_edge_is_rejected(self):
         # case width is 320mm; centre 318 + half 5.5 spills past the right edge.
         with pytest.raises(SystemExit):
-            make_parameters(cable_hole_x_offset=318).validate_cable_hole_position()
+            make_parameters(cable_hole_x_offset=318).validate_cable_hole()
 
     def test_negative_offset_is_rejected(self):
         with pytest.raises(SystemExit):
-            make_parameters(cable_hole_x_offset=2).validate_cable_hole_position()
+            make_parameters(cable_hole_x_offset=2).validate_cable_hole()
 
     def test_hole_wider_than_case_is_rejected(self):
         with pytest.raises(SystemExit):
-            make_parameters(cable_hole_width=400).validate_cable_hole_position()
+            make_parameters(cable_hole_width=400).validate_cable_hole()
+
+    def test_zero_width_is_rejected(self):
+        with pytest.raises(SystemExit):
+            make_parameters(cable_hole_width=0).validate_cable_hole()
+
+
+class TestCableHoleHeightBounds:
+    def test_hole_at_the_height_limit_is_accepted(self):
+        # available = case_height_base_removed - plate - down_offset = 17 - 1.111 - 1
+        make_parameters(cable_hole_height=14.889).validate_cable_hole()
+
+    def test_hole_taller_than_available_space_is_rejected(self):
+        # 15mm would push the hole bottom below the case floor.
+        with pytest.raises(SystemExit):
+            make_parameters(cable_hole_height=15).validate_cable_hole()
+
+    def test_down_offset_reduces_the_available_height(self):
+        # A hole that fits with down_offset 1 no longer fits pushed 4mm lower.
+        make_parameters(cable_hole_height=13, cable_hole_down_offset=1).validate_cable_hole()
+        with pytest.raises(SystemExit):
+            make_parameters(cable_hole_height=13, cable_hole_down_offset=4).validate_cable_hole()
+
+    def test_zero_height_is_rejected(self):
+        with pytest.raises(SystemExit):
+            make_parameters(cable_hole_height=0).validate_cable_hole()
 
 
 class TestParametersCableHoleCenter:

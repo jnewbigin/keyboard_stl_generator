@@ -302,7 +302,7 @@ class Parameters():
 
         self.update_calculated_attributes()
 
-        self.validate_cable_hole_position()
+        self.validate_cable_hole()
 
     def build_attr_from_dict(self, parameter_dict: dict) -> None:
 
@@ -387,16 +387,38 @@ class Parameters():
             print('ERROR:', error_message)
             exit(1)
 
-    def validate_cable_hole_position(self) -> None:
-        # Runs from set_dimensions, once real_case_width is known. The case
-        # spans x = 0 to real_case_width, so the hole must sit fully inside.
+    def validate_cable_hole(self) -> None:
+        # Runs from set_dimensions, once the real case size is known. The top
+        # piece spans x = 0 .. real_case_width and z = 0 (case floor) up to the
+        # plate underside, so the hole must sit fully inside both.
         if self.cable_hole != True:
             return
 
+        assert self.case_height_base_removed is not None
+        parameter_error = False
+        error_message = ''
+
+        if self.cable_hole_width <= 0:
+            parameter_error = True
+            error_message += 'cable_hole_width must be greater than 0\n'
+
+        if self.cable_hole_height <= 0:
+            parameter_error = True
+            error_message += 'cable_hole_height must be greater than 0\n'
+
         center = self.cable_hole_center_x()
         half_width = self.cable_hole_width / 2
-
         if center - half_width < 0 or center + half_width > self.real_case_width:
-            print('ERROR: cable hole (centre %.2fmm, width %.2fmm) does not fit '
-                  'within the %.2fmm case width' % (center, self.cable_hole_width, self.real_case_width))
+            parameter_error = True
+            error_message += ('cable hole (centre %.2fmm, width %.2fmm) does not fit within the %.2fmm case width\n'
+                              % (center, self.cable_hole_width, self.real_case_width))
+
+        available_height = self.case_height_base_removed - self.plate_thickness - self.cable_hole_down_offset
+        if self.cable_hole_height > available_height:
+            parameter_error = True
+            error_message += ('cable hole (height %.2fmm) does not fit within the %.2fmm available below the plate\n'
+                              % (self.cable_hole_height, available_height))
+
+        if parameter_error == True:
+            print('ERROR:', error_message)
             exit(1)
