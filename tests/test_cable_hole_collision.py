@@ -7,6 +7,8 @@ centred at ``left_margin + real_max_x / 2`` - the two coincide only when the
 side margins are symmetric, which is exactly what the old exact-midpoint check
 got wrong.
 """
+import pytest
+
 from parameters import Parameters
 from body import Body
 
@@ -102,6 +104,45 @@ class TestConfigurablePosition:
         over_hole = 40 - body.screw_edge_x_inset
         assert body.screw_clashes_with_cable_hole(over_hole, body.y_screw_width)
         assert not body.screw_clashes_with_cable_hole(body.x_screw_width / 2, body.y_screw_width)
+
+
+def make_parameters(**overrides):
+    """Parameters with real dimensions set, ready for validate_cable_hole_position."""
+    params = dict(left_margin=10, right_margin=10, top_margin=10, bottom_margin=10,
+                  cable_hole=True, cable_hole_width=11)
+    params.update(overrides)
+    parameters = Parameters(params)
+    parameters.real_max_x = 300.0
+    parameters.real_max_y = 200.0
+    parameters.real_case_width = parameters.real_max_x + parameters.left_margin + parameters.right_margin
+    parameters.real_case_height = parameters.real_max_y + parameters.top_margin + parameters.bottom_margin
+    parameters.update_calculated_attributes()
+    return parameters
+
+
+class TestCableHoleBounds:
+    def test_centred_hole_is_within_bounds(self):
+        make_parameters().validate_cable_hole_position()  # must not exit
+
+    def test_offset_hole_within_bounds_is_accepted(self):
+        make_parameters(cable_hole_x_offset=30).validate_cable_hole_position()
+
+    def test_disabled_cable_hole_is_never_checked(self):
+        # An impossible offset is ignored when there is no cable hole.
+        make_parameters(cable_hole=False, cable_hole_x_offset=9999).validate_cable_hole_position()
+
+    def test_offset_past_right_edge_is_rejected(self):
+        # case width is 320mm; centre 318 + half 5.5 spills past the right edge.
+        with pytest.raises(SystemExit):
+            make_parameters(cable_hole_x_offset=318).validate_cable_hole_position()
+
+    def test_negative_offset_is_rejected(self):
+        with pytest.raises(SystemExit):
+            make_parameters(cable_hole_x_offset=2).validate_cable_hole_position()
+
+    def test_hole_wider_than_case_is_rejected(self):
+        with pytest.raises(SystemExit):
+            make_parameters(cable_hole_width=400).validate_cable_hole_position()
 
 
 class TestParametersCableHoleCenter:

@@ -302,6 +302,8 @@ class Parameters():
 
         self.update_calculated_attributes()
 
+        self.validate_cable_hole_position()
+
     def build_attr_from_dict(self, parameter_dict: dict) -> None:
 
         for param in parameter_dict.keys():
@@ -383,4 +385,18 @@ class Parameters():
 
         if parameter_error == True:
             print('ERROR:', error_message)
+            exit(1)
+
+    def validate_cable_hole_position(self) -> None:
+        # Runs from set_dimensions, once real_case_width is known. The case
+        # spans x = 0 to real_case_width, so the hole must sit fully inside.
+        if self.cable_hole != True:
+            return
+
+        center = self.cable_hole_center_x()
+        half_width = self.cable_hole_width / 2
+
+        if center - half_width < 0 or center + half_width > self.real_case_width:
+            print('ERROR: cable hole (centre %.2fmm, width %.2fmm) does not fit '
+                  'within the %.2fmm case width' % (center, self.cable_hole_width, self.real_case_width))
             exit(1)
