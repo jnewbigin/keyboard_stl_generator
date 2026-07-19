@@ -86,6 +86,38 @@ class TestAsymmetricMargins:
         assert body.screw_clashes_with_cable_hole(over_hole, body.y_screw_width)
 
 
+class TestConfigurablePosition:
+    def test_default_offset_is_centred_on_key_field(self):
+        body = make_body()
+        assert body.cable_hole_center_x() == body.left_margin + body.real_max_x / 2
+
+    def test_explicit_offset_overrides_the_centre(self):
+        body = make_body(cable_hole_x_offset=40)
+        assert body.cable_hole_center_x() == 40
+
+    def test_offset_moves_which_screw_clashes(self):
+        # Put the hole hard against the left at 40mm from the case edge. A screw
+        # sitting there clashes; the key-field-centre screw no longer does.
+        body = make_body(cable_hole_x_offset=40)
+        over_hole = 40 - body.screw_edge_x_inset
+        assert body.screw_clashes_with_cable_hole(over_hole, body.y_screw_width)
+        assert not body.screw_clashes_with_cable_hole(body.x_screw_width / 2, body.y_screw_width)
+
+
+class TestParametersCableHoleCenter:
+    def test_center_defaults_to_key_field_centre(self):
+        parameters = Parameters(dict(left_margin=10, cable_hole=True))
+        parameters.real_max_x = 300.0
+        parameters.update_calculated_attributes()
+        assert parameters.cable_hole_center_x() == 160.0
+
+    def test_center_honours_explicit_offset(self):
+        parameters = Parameters(dict(left_margin=10, cable_hole=True, cable_hole_x_offset=25))
+        parameters.real_max_x = 300.0
+        parameters.update_calculated_attributes()
+        assert parameters.cable_hole_center_x() == 25
+
+
 class TestWideCableHole:
     def test_multiple_adjacent_screws_are_dropped(self):
         # A 40mm hole (clearance = 20 + 4 = 24mm) spans several top screws; the

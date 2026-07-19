@@ -531,7 +531,7 @@ class Body():
 
     def cable_hole_center_x(self) -> float:
         # Horizontal centre of the cable hole, matching Cable.get_cable_hole().
-        return self.left_margin + (self.real_max_x / 2)
+        return self.parameters.cable_hole_center_x()
 
     def screw_clashes_with_cable_hole(self, screw_x: float, screw_y: float) -> bool:
         # screw_x, screw_y are in the normalised screw grid (0..x_screw_width,

@@ -253,7 +253,7 @@ class Cable():
         if self.parameters.cable_hole == True:
             assert self.parameters.case_height_base_removed is not None
             return up(self.parameters.case_height_base_removed - (self.parameters.cable_hole_height / 2) - self.parameters.plate_thickness - self.parameters.cable_hole_down_offset ) (
-                right(self.parameters.left_margin + (self.parameters.real_max_x / 2)) ( 
+                right(self.parameters.cable_hole_center_x()) (
                     forward(self.parameters.bottom_margin + self.parameters.top_margin + self.parameters.real_max_y) ( 
                         cube([self.parameters.cable_hole_width, self.parameters.case_wall_thickness * 2, self.parameters.cable_hole_height], center = True) 
                     ) 

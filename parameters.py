@@ -123,6 +123,9 @@ class Parameters():
         self.cable_hole_height = 10
         self.cable_hole_up_offset = 1
         self.cable_hole_down_offset = 1
+        # Horizontal centre of the cable hole in mm from the left case edge.
+        # None keeps the hole centred on the key field.
+        self.cable_hole_x_offset: float | None = None
 
         self.custom_polygons: list | None = None
 
@@ -198,6 +201,13 @@ class Parameters():
 
     def U(self, u_value: float) -> float:
         return u_value * self.switch_spacing
+
+    def cable_hole_center_x(self) -> float:
+        # Real x of the cable hole centre once the assembly is placed (the case
+        # left edge sits at x = 0). Requires set_dimensions to have run.
+        if self.cable_hole_x_offset is not None:
+            return self.cable_hole_x_offset
+        return self.left_margin + (self.real_max_x / 2)
 
     def update_calculated_attributes(self) -> None:
         # Calculated attributes
