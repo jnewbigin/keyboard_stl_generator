@@ -621,11 +621,23 @@ class Keyboard():
                     for y in collection.get_y_list_in_rx_ry_x(x, rx, ry):
                         yield collection.get_item(x, y, rx, ry)
 
+    def _full_board_bounds(self) -> tuple[float, float, float, float]:
+        # Bounds of the whole board (min_x, max_x, max_y, min_y) merging the
+        # non-rotated switches with the real, post-rotation extent of any
+        # rotated clusters - the same merge set_dimensions uses for the case
+        # size. Rotated ergo halves dip below the central cluster, so relying on
+        # switch_collection alone underestimates the board and leaves the extra
+        # plate uncut.
+        (min_x, max_x, max_y, min_y) = self.switch_collection.get_collection_bounds()
+        (r_min_x, r_max_x, r_max_y, r_min_y) = self.switch_rotation_collection.get_real_collection_bounds()
+        return (min(min_x, r_min_x), max(max_x, r_max_x),
+                max(max_y, r_max_y), min(min_y, r_min_y))
+
     def _board_y_band_edges(self) -> list[float]:
         # Every distinct row edge across the whole board (plus the top/bottom
         # margins), so a section's clip and its neighbour's clip sweep the exact
         # same y-bands and their shared seam lines up band for band.
-        (b_min_x, b_max_x, b_max_y, b_min_y) = self.switch_collection.get_collection_bounds()
+        (b_min_x, b_max_x, b_max_y, b_min_y) = self._full_board_bounds()
         top_margin_cells = (self.parameters.top_margin / self.parameters.switch_spacing) + 1
         bottom_margin_cells = (self.parameters.bottom_margin / self.parameters.switch_spacing) + 1
         sweep_lo = b_min_y - bottom_margin_cells
@@ -718,7 +730,7 @@ class Keyboard():
         # void (nothing is left unclaimed). Outer sides are the board edge.
         clip = union()
         section_count = len(self.switch_section_list)
-        (b_min_x, b_max_x, b_max_y, b_min_y) = self.switch_collection.get_collection_bounds()
+        (b_min_x, b_max_x, b_max_y, b_min_y) = self._full_board_bounds()
         U = self.parameters.U
 
         boundaries = self._section_x_boundaries()
@@ -841,7 +853,7 @@ class Keyboard():
         # for the outer sides), taken across every row so a seam that bulges
         # around a straddling key is measured at its widest. Height is the full
         # board height, since sections only split along x.
-        (b_min_x, b_max_x, b_max_y, b_min_y) = self.switch_collection.get_collection_bounds()
+        (b_min_x, b_max_x, b_max_y, b_min_y) = self._full_board_bounds()
         U = self.parameters.U
         board_left = U(b_min_x) - self.parameters.left_margin
         board_right = U(b_max_x) + self.parameters.right_margin
