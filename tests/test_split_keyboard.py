@@ -181,6 +181,28 @@ def _band_mids(keyboard):
     return [(lo + hi) / 2.0 for lo, hi in zip(edges, edges[1:]) if hi - lo > 1e-9]
 
 
+class TestFullBoardCoverage:
+    def test_bands_cover_rotated_cluster_below_central_keys(self):
+        # A rotated ergo cluster dips well below the non-rotated keys. The section
+        # clip must sweep the whole board (the same merged bounds the case size
+        # uses), otherwise the plate below the central cluster is never cut and
+        # every section keeps that full-width strip.
+        keyboard = build_keyboard("rotated_cluster.json", x_build_size=200)
+        assert keyboard.get_top_section_count() >= 2
+
+        central_min_y = keyboard.switch_collection.get_collection_bounds()[3]
+        merged_min_y = keyboard._full_board_bounds()[3]
+        # The rotated cluster really does extend the board past the central keys.
+        assert merged_min_y < central_min_y - 1e-6
+
+        bottom_margin_cells = (keyboard.parameters.bottom_margin
+                               / keyboard.parameters.switch_spacing) + 1
+        lowest_band = min(keyboard._board_y_band_edges())
+        # Bands reach the true board bottom, not just the central cluster's.
+        assert lowest_band <= merged_min_y - bottom_margin_cells + 1e-9
+        assert lowest_band < central_min_y - bottom_margin_cells - 1e-6
+
+
 class TestSharedSectionSeams:
     def test_seam_never_cuts_a_key(self):
         # The shared seam must never fall strictly inside a key on that key's row,
