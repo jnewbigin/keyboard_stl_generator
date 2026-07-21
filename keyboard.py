@@ -149,7 +149,7 @@ class Keyboard():
                         y_offset = -(y)
 
                         switch = Switch(x_offset, y_offset, w, h, rotation = rotation, z_offset = z_offset, cell_value = col_escaped, switch_config = self.switch_config, parameters = self.parameters)
-                        support = Support(x_offset, y_offset, w, h, self.parameters.plate_thickness, self.parameters.support_bar_height, self.parameters.support_bar_width, rotation = rotation, z_offset = z_offset, parameters = self.parameters)
+                        support = Support(x_offset, y_offset, w, h, self.parameters.plate_thickness, self.parameters.support_bar_height, self.parameters.support_bar_width, support_bar_fillet = self.parameters.support_bar_fillet, rotation = rotation, z_offset = z_offset, parameters = self.parameters)
                         support_cutout = SupportCutout(x_offset, y_offset, w, h, self.parameters.plate_thickness, self.parameters.support_bar_height, self.parameters.support_bar_width, rotation = rotation, z_offset = z_offset, parameters = self.parameters)
 
                         # Create switch cutout and support object without rotation
