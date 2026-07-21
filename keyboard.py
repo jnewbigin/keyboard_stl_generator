@@ -76,6 +76,12 @@ class Keyboard():
         self.support_section_list = [ItemCollection()]
         self.support_cutout_section_list = [ItemCollection()]
 
+        # Section boundaries (mm x) chosen from the real key footprints when the
+        # board has rotated clusters. None means the plain non-rotated column
+        # splitter decides the seams (see _section_x_boundaries).
+        self.planned_boundaries: list[float] | None = None
+        self.split_recommendation: str | None = None
+
         self.cable = Cable(parameters)
 
 
@@ -493,7 +499,15 @@ class Keyboard():
 
 
     def split_keyboard(self) -> None:
-        
+        # Boards with rotated clusters (split/ergo layouts) can't be sectioned by
+        # the plain column splitter below - it only sees the non-rotated keys and
+        # would run a seam straight through a rotated cluster. Route those through
+        # the footprint-aware planner, which keeps each cluster whole and places
+        # the seams in the real gaps. Non-rotated boards keep the original path.
+        cluster_spans = self._rotated_cluster_spans()
+        if cluster_spans:
+            self._split_keyboard_by_footprint(cluster_spans)
+            return
 
         (min_x, max_x, max_y, min_y) = self.switch_collection.get_collection_bounds()
         self.logger.debug('max_x: %d, min_y: %d', max_x, min_y)
@@ -532,6 +546,143 @@ class Keyboard():
 
         for section_collection in self.switch_section_list:
             section_collection.set_collection_neighbors()
+
+    def _rotated_cluster_spans(self) -> list[tuple[float, float]]:
+        # Real (post-rotation) x-extent in mm of each rotated cluster, merged
+        # where clusters overlap in x. A boundary must never fall inside one of
+        # these spans, so the seam can't slice a rotated key. Empty for a plain
+        # non-rotated board.
+        #
+        # Mirror exactly how RotationCollection.get_rotated_moved_union places
+        # the keys: each key's cell corners are rotated about the origin by
+        # -rotation, then the cluster is shifted right by U(rx). Using the full
+        # key cell (not the smaller switch cutout) keeps the span conservative.
+        U = self.parameters.U
+        spans: list[list[float]] = []
+        for rotation, collection in self.switch_rotation_collection.rotation_collection.items():
+            theta = math.radians(-rotation)
+            cos_t, sin_t = math.cos(theta), math.sin(theta)
+            xs: list[float] = []
+            for rx in collection.get_rx_list():
+                x_shift = U(rx)
+                for ry in collection.get_ry_list_in_rx(rx):
+                    for x in collection.get_x_list_in_rx_ry(rx, ry):
+                        for y in collection.get_y_list_in_rx_ry_x(x, rx, ry):
+                            item = collection.get_item(x, y, rx, ry)
+                            corners = ((item.x, item.y), (item.x + item.w, item.y),
+                                       (item.x + item.w, item.y - item.h), (item.x, item.y - item.h))
+                            for cell_x, cell_y in corners:
+                                real_x, real_y = U(cell_x), U(cell_y)
+                                xs.append((real_x * cos_t - real_y * sin_t) + x_shift)
+            if xs:
+                spans.append([min(xs), max(xs)])
+        spans.sort()
+        merged: list[list[float]] = []
+        for lo, hi in spans:
+            if merged and lo <= merged[-1][1]:
+                merged[-1][1] = max(merged[-1][1], hi)
+            else:
+                merged.append([lo, hi])
+        return [(lo, hi) for lo, hi in merged]
+
+    @staticmethod
+    def plan_section_cuts(board_left: float, board_right: float, plate: float,
+                          uncuttable_spans: list[tuple[float, float]], safety: float) -> tuple[list[float], bool]:
+        # Choose the fewest boundary x positions (mm) that cut the board into
+        # sections no wider than the plate, with no boundary inside an uncuttable
+        # (rotated cluster) span. Greedy: extend each section as far right as the
+        # plate allows, then pull the cut left of any cluster it lands in (with a
+        # safety gap so seam finger jitter can't reach the cluster). Returns
+        # (cuts, ok); ok is False when a cluster is too wide to fit the plate.
+        spans = sorted(uncuttable_spans)
+
+        def run(tight: bool) -> tuple[list[float], bool]:
+            cuts: list[float] = []
+            start = board_left
+            for _ in range(1000):
+                if board_right - start <= plate + 1e-6:
+                    return cuts, True
+                limit = start + plate
+                cut = limit
+                if tight:
+                    # End the section right after the last cluster that fully
+                    # fits, instead of running to the plate limit. That keeps a
+                    # cluster's section snug so the keys just past it fall in the
+                    # next section and the seam needn't bulge past the plate to
+                    # clear them.
+                    ends = [hi + safety for lo, hi in spans
+                            if lo >= start - 1e-9 and hi + safety <= limit + 1e-9]
+                    if ends:
+                        cut = max(ends)
+                # Pull the cut clear of any cluster it lands in. Right-to-left so
+                # a move that lands in an earlier cluster is caught in the same
+                # pass; cut only ever decreases, so this terminates.
+                for lo, hi in reversed(spans):
+                    if lo - safety < cut < hi + safety:
+                        cut = lo - safety
+                if cut <= start + 1e-6:
+                    return cuts, False
+                cuts.append(cut)
+                start = cut
+            return cuts, False
+
+        greedy_cuts, greedy_ok = run(False)
+        tight_cuts, tight_ok = run(True)
+        # Prefer the snug placement when it needs no extra sections; otherwise the
+        # greedy one uses the fewest sections.
+        if tight_ok and len(tight_cuts) <= len(greedy_cuts):
+            return tight_cuts, tight_ok
+        return greedy_cuts, greedy_ok
+
+    def _split_keyboard_by_footprint(self, cluster_spans: list[tuple[float, float]]) -> None:
+        U = self.parameters.U
+        (f_min_x, f_max_x, f_max_y, f_min_y) = self._full_board_bounds()
+        board_left = U(f_min_x) - self.parameters.left_margin
+        board_right = U(f_max_x) + self.parameters.right_margin
+        plate = self.parameters.x_build_size
+        safety = self.parameters.section_finger_depth + self.kerf + 1.0
+
+        cuts, fits = self.plan_section_cuts(board_left, board_right, plate, cluster_spans, safety)
+        self.planned_boundaries = cuts
+        section_count = len(cuts) + 1
+
+        while len(self.switch_section_list) < section_count:
+            self.switch_section_list.append(ItemCollection())
+            self.support_section_list.append(ItemCollection())
+            self.support_cutout_section_list.append(ItemCollection())
+
+        # Each non-rotated key joins the section its centre falls in; the seam
+        # then routes around it so it is never cut. Rotated keys are kept whole by
+        # the cut placement, so the clip assigns them to the correct side without
+        # them needing to live in a section collection (their local coordinates
+        # would break the seam maths - that is a later step).
+        for x in self.switch_collection.get_sorted_x_list():
+            for y in self.switch_collection.get_sorted_y_list_in_x(x):
+                item = self.switch_collection.get_item(x, y)
+                centre = (item.x_start_mm + item.x_end_mm) / 2.0
+                section = sum(1 for cut in cuts if centre >= cut)
+                self.switch_section_list[section].add_item(x, y, item)
+                self.support_section_list[section].add_item(x, y, self.support_collection.get_item(x, y))
+                self.support_cutout_section_list[section].add_item(x, y, self.support_cutout_collection.get_item(x, y))
+
+        for section_collection in self.switch_section_list:
+            section_collection.set_collection_neighbors()
+
+        self.split_recommendation = self._describe_split(cuts, plate, fits)
+
+    def _describe_split(self, cuts: list[float], plate: float, fits: bool) -> str:
+        # Report the true section widths (these include the seam's finger/weave
+        # around keys), so an over-plate section is flagged honestly.
+        widths = [w for (w, _h) in self.get_top_section_dimensions()]
+        lines = ['Split recommendation (rotated layout, plate %.0f mm):' % plate]
+        if not fits:
+            lines.append('  WARNING: a rotated cluster is wider than the plate - it cannot be split to fit.')
+        lines.append('  %d section(s); cut at x = %s mm'
+                     % (len(cuts) + 1, ', '.join('%.1f' % c for c in cuts) if cuts else '(none)'))
+        for i, w in enumerate(widths):
+            flag = '' if w <= plate + 1e-6 else '  (exceeds plate - needs finer/angled splitting)'
+            lines.append('    section %d width %.1f mm%s' % (i, w, flag))
+        return '\n'.join(lines)
 
     @staticmethod
     def _assign_x_sections(columns: list[tuple[float, list[float]]], threshold: float, left_margin: float) -> list[list[int]]:
@@ -655,6 +806,12 @@ class Keyboard():
         # two sections' keys and clamped so neither section's plate can exceed
         # x_build_size. Both neighbouring sections read the same value, so their
         # plates meet with no overlap and no void.
+        #
+        # A footprint-planned board (rotated clusters) has already chosen cuts in
+        # the real gaps; use them verbatim so the seam sits where a cluster is
+        # kept whole.
+        if self.planned_boundaries is not None:
+            return list(self.planned_boundaries)
         U = self.parameters.U
         build = self.parameters.x_build_size
         left_margin = self.parameters.left_margin
@@ -768,13 +925,24 @@ class Keyboard():
         self.logger.debug('real_case_width: %f', self.parameters.real_case_width)
         self.logger.debug('real_case_height: %f', self.parameters.real_case_height)
 
-        assert self.parameters.bottom_section_count is not None
-        section_size = self.parameters.real_case_width / self.parameters.bottom_section_count
+        if self.planned_boundaries is not None:
+            # Split the bottom cover at the same footprint-planned boundaries as
+            # the plate. start_x = boundary + right_margin lines the slab up with
+            # the top seam once both are shifted into place (x_offset below undoes
+            # the right_margin). Outer sections run well past the case edge.
+            cuts = self.planned_boundaries
+            last = len(cuts)
+            rm = self.parameters.right_margin
+            start_x = -1000.0 if section_number == 0 else cuts[section_number - 1] + rm
+            end_x = self.parameters.real_case_width + 1000.0 if section_number == last else cuts[section_number] + rm
+        else:
+            assert self.parameters.bottom_section_count is not None
+            section_size = self.parameters.real_case_width / self.parameters.bottom_section_count
 
-        self.logger.debug('section_size: %f', section_size)
+            self.logger.debug('section_size: %f', section_size)
 
-        start_x = section_size * section_number
-        end_x = start_x + section_size
+            start_x = section_size * section_number
+            end_x = start_x + section_size
 
         (start_x, end_x) = self.get_screw_support_interference_offset(start_x, end_x)
 
@@ -876,5 +1044,7 @@ class Keyboard():
 
 
     def get_bottom_section_count(self) -> int:
+        if self.planned_boundaries is not None:
+            return len(self.planned_boundaries) + 1
         assert self.parameters.bottom_section_count is not None
         return self.parameters.bottom_section_count

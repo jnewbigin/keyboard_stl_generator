@@ -9,6 +9,8 @@ guard the wiring.
 import json
 from pathlib import Path
 
+import pytest
+
 from parameters import Parameters
 from keyboard import Keyboard
 
@@ -179,6 +181,79 @@ class TestSplitKeyboardEndToEnd:
 def _band_mids(keyboard):
     edges = keyboard._board_y_band_edges()
     return [(lo + hi) / 2.0 for lo, hi in zip(edges, edges[1:]) if hi - lo > 1e-9]
+
+
+class TestPlanSectionCuts:
+    # Pure planner: choose cut positions (mm) that keep every section within the
+    # plate and never fall inside a rotated cluster span.
+    def test_board_fits_one_plate(self):
+        assert Keyboard.plan_section_cuts(0, 100, 200, [], 5) == ([], True)
+
+    def test_wide_board_no_clusters_cuts_greedily(self):
+        cuts, ok = Keyboard.plan_section_cuts(0, 500, 200, [], 5)
+        assert ok and cuts == [200, 400]
+
+    def test_cut_avoids_cluster_it_would_land_in(self):
+        cuts, ok = Keyboard.plan_section_cuts(0, 500, 200, [(180, 260)], 5)
+        assert ok
+        for c in cuts:
+            assert not (180 <= c <= 260), 'cut %s fell inside the cluster' % c
+
+    def test_cluster_wider_than_plate_is_flagged(self):
+        cuts, ok = Keyboard.plan_section_cuts(0, 500, 200, [(50, 300)], 5)
+        assert ok is False
+
+    def test_cluster_section_kept_snug_when_it_saves_no_sections(self):
+        # A big central cluster: the section holding it should end right after the
+        # cluster (tight) rather than run to the plate limit, so the piece stays
+        # small enough to print. Without this the middle section overflows.
+        cuts, ok = Keyboard.plan_section_cuts(-4.3, 523.4, 300, [(111, 338)], 5.3)
+        assert ok and len(cuts) == 2
+        assert cuts[0] < 111 and cuts[1] > 338          # both cuts clear the cluster
+        edges = [-4.3] + cuts + [523.4]
+        widths = [edges[i + 1] - edges[i] for i in range(len(edges) - 1)]
+        assert max(widths) <= 300 + 1e-6
+
+
+class TestFootprintSplitEndToEnd:
+    def test_non_rotated_board_uses_plain_splitter(self):
+        # No rotated keys -> no plan; the original column splitter runs unchanged.
+        keyboard = build_keyboard("wide_board.json", x_build_size=300)
+        assert keyboard.planned_boundaries is None
+        assert keyboard.split_recommendation is None
+
+    def test_cluster_span_matches_rendered_geometry(self):
+        # The cluster span must match where the keys actually render (the
+        # rotate-about-origin-then-shift transform), not a different frame. The
+        # expected range was measured from the OpenSCAD output of the fixture's
+        # rotated cluster (cutouts x=[27.99, 115.12]); the span is deliberately a
+        # touch wider because it uses whole key cells, and must contain them.
+        keyboard = build_keyboard("rotated_cluster.json", x_build_size=200)
+        spans = keyboard._rotated_cluster_spans()
+        assert len(spans) == 1
+        lo, hi = spans[0]
+        assert lo == pytest.approx(24.95, abs=0.5)
+        assert hi == pytest.approx(118.16, abs=0.5)
+        # contains the rendered cutout extent
+        assert lo <= 27.99 and hi >= 115.12
+
+    def test_rotated_board_is_planned_and_clusters_kept_whole(self):
+        for plate in (200, 150, 120, 100):
+            keyboard = build_keyboard("rotated_cluster.json", x_build_size=plate)
+            assert keyboard.planned_boundaries is not None
+            spans = keyboard._rotated_cluster_spans()
+            assert spans, 'fixture should have a rotated cluster'
+            for cut in keyboard.planned_boundaries:
+                for lo, hi in spans:
+                    assert not (lo <= cut <= hi), \
+                        'plate %d: cut %.1f slices cluster [%.1f, %.1f]' % (plate, cut, lo, hi)
+            # top and bottom cover are split into the same number of pieces.
+            assert keyboard.get_bottom_section_count() == keyboard.get_top_section_count()
+
+    def test_planned_sections_fit_the_plate(self):
+        keyboard = build_keyboard("rotated_cluster.json", x_build_size=200)
+        for width, _height in keyboard.get_top_section_dimensions():
+            assert width <= 200 + 1e-6
 
 
 class TestFullBoardCoverage:
