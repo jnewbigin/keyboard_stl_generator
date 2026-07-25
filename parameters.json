@@ -5,7 +5,7 @@
     "kerf" : 0.23,
 
     "switch_type": "mx",
-    "xcustom_switch": {
+    /* "custom_switch": {
         "points": [
             [8, 8],
             [7, -7],
@@ -13,7 +13,7 @@
             [-7, 7]
         ],
         "path": [0, 1, 2, 3]
-    },
+    }, */
     "stabilizer_type": "custom",
 
 

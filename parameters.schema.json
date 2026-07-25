@@ -1,0 +1,483 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/jnewbigin/keyboard_stl_generator/parameters.schema.json",
+    "title": "Keyboard STL Generator parameters",
+    "description": "Parameter file for keyboard_stl_generator.py, passed with -p. Files may be written as JSON or JSON5 (// comments and trailing commas are allowed), so a block can be disabled by commenting it out.",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+        "$schema": {
+            "type": "string",
+            "description": "Path or URL of this schema, for editor completion and validation."
+        },
+        "include": {
+            "description": "Other parameter files to merge in before this file's own keys. Paths are relative to this file. Files are merged in list order and later files win, so the last include beats the ones before it and this file beats all of them.",
+            "oneOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+
+        "x_build_size": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "X build plate size in mm. The case is split into sections that fit this."
+        },
+        "y_build_size": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Y build plate size in mm."
+        },
+        "kerf": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Kerf in mm to allow for expansion of material, giving switch holes a bit more space."
+        },
+        "switch_spacing": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Distance in mm between the centres of adjacent 1u switches. Default 19.05."
+        },
+
+        "switch_type": {
+            "enum": ["mx_openable", "mx", "mx_alps", "alps", "custom"],
+            "description": "Switch cutout type. Default mx_openable. Overridden by custom_switch."
+        },
+        "stabilizer_type": {
+            "enum": ["cherry_costar", "cherry", "costar", "alps", "custom"],
+            "description": "Stabilizer cutout type. Default cherry_costar."
+        },
+        "custom_shape": {
+            "type": "boolean",
+            "description": "Use the custom_shape_points outline for the switch cutout. Set for you when custom_switch is used."
+        },
+        "custom_shape_points": {
+            "oneOf": [
+                {
+                    "$ref": "#/$defs/points"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "description": "x, y coordinates of the custom switch cutout outline, with (0, 0) at the centre of the cutout. The long hand form of custom_switch.points."
+        },
+        "custom_shape_path": {
+            "oneOf": [
+                {
+                    "$ref": "#/$defs/path"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "description": "Order in which custom_shape_points are traversed. Omit to use the order they are listed in."
+        },
+        "custom_switch": {
+            "type": "object",
+            "description": "A custom switch cutout shape. If defined it overrides switch_type.",
+            "additionalProperties": false,
+            "required": ["points"],
+            "properties": {
+                "points": {
+                    "$ref": "#/$defs/points",
+                    "description": "x, y coordinates of the cutout outline, with (0, 0) at the centre of the cutout."
+                },
+                "path": {
+                    "$ref": "#/$defs/path",
+                    "description": "Order in which the points are traversed. Omit to use the order they are listed in."
+                }
+            }
+        },
+
+        "plate_supports": {
+            "type": "boolean",
+            "description": "Generate support ridges that strengthen the plate."
+        },
+        "support_bar_height": {
+            "type": "number",
+            "minimum": 0,
+            "description": "How far down from the top of the plate the support bars reach, in mm."
+        },
+        "support_bar_width": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Width of the support bars in mm."
+        },
+        "support_bar_fillet": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Radius in mm of the fillet where a support bar meets the plate."
+        },
+
+        "plate_thickness": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Plate thickness in mm. Affects how well switches clip into the plate."
+        },
+        "top_margin": {
+            "type": "number",
+            "description": "Extra material added above the key field, in mm."
+        },
+        "bottom_margin": {
+            "type": "number",
+            "description": "Extra material added below the key field, in mm."
+        },
+        "left_margin": {
+            "type": "number",
+            "description": "Extra material added to the left of the key field, in mm."
+        },
+        "right_margin": {
+            "type": "number",
+            "description": "Extra material added to the right of the key field, in mm."
+        },
+        "case_height": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Height of the case in mm. With tilt this is the height of the lowest part."
+        },
+        "case_wall_thickness": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Thickness of the case walls in mm."
+        },
+        "plate_corner_radius": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Radius in mm used to round the corners of the case."
+        },
+        "bottom_cover_thickness": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Thickness of the base plate of the case in mm."
+        },
+        "tilt": {
+            "type": "number",
+            "description": "Degrees the case is tilted forward."
+        },
+        "case_height_extra": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Extra height in mm added to the case solid before the tilt is cut away."
+        },
+
+        "section_finger_depth": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Depth in mm of the interlocking fingers on the seam between printed sections. 0 gives a plain butt joint."
+        },
+        "section_finger_height": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "How far, in key units, the seam travels before the finger alternates to the other side."
+        },
+
+        "screw_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of mounting screw holes. Must be 0 or an even number of at least 4. A hole that would clash with the cable hole is dropped."
+        },
+        "screw_diameter": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Diameter of the screws in mm."
+        },
+        "screw_edge_inset": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Distance in mm from the edge of the plate to the centre of a screw hole."
+        },
+        "screw_edge_x_inset": {
+            "type": ["number", "null"],
+            "minimum": 0,
+            "description": "Overrides screw_edge_inset for the left and right edges."
+        },
+        "screw_edge_y_inset": {
+            "type": ["number", "null"],
+            "minimum": 0,
+            "description": "Overrides screw_edge_inset for the top and bottom edges."
+        },
+        "screw_hole_body_wall_width": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Wall thickness in mm of the boss around a screw hole."
+        },
+        "screw_hole_body_support_x_factor": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Controls how far the support fillet of a screw boss extends. Larger values give a shorter support."
+        },
+        "custom_screw_hole_coordinates": {
+            "type": ["array", "null"],
+            "description": "Explicit screw hole positions, replacing the generated grid. Each entry is an x, y coordinate, optionally followed by the direction of the boss support.",
+            "items": {
+                "$ref": "#/$defs/screw_hole_coordinate"
+            }
+        },
+        "custom_screw_hole_coordinates_origin": {
+            "$ref": "#/$defs/coordinate",
+            "description": "Origin the custom_screw_hole_coordinates are measured from. With a custom PCB this must be in the same coordinate system as pcb_top_left_coordinates."
+        },
+
+        "cable_hole": {
+            "type": "boolean",
+            "description": "Generate a hole in the back of the case for a cable."
+        },
+        "cable_hole_width": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Width of the cable hole in mm."
+        },
+        "cable_hole_height": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Height of the cable hole in mm."
+        },
+        "cable_hole_x_offset": {
+            "type": ["number", "null"],
+            "description": "Horizontal centre of the cable hole in mm from the left edge of the case. Omit or null to centre it on the key field."
+        },
+        "cable_hole_up_offset": {
+            "type": "number",
+            "description": "How far up the cable hole is moved from its default position, in mm."
+        },
+        "cable_hole_down_offset": {
+            "type": "number",
+            "description": "How far down from the underside of the plate the cable hole is placed, in mm."
+        },
+        "cable_diameter": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Diameter of the cable in mm, used to size the strain relief clamp."
+        },
+
+        "custom_polygons": {
+            "type": ["array", "null"],
+            "description": "Extra cutouts in the top plate, for things like OLED displays or encoders.",
+            "items": {
+                "$ref": "#/$defs/custom_polygon"
+            }
+        },
+
+        "custom_pcb": {
+            "type": ["boolean", "null"],
+            "description": "Size the case to fit a specific PCB. When true, all the pcb_ parameters are required and the margins are calculated from them."
+        },
+        "pcb_width": {
+            "type": ["number", "null"],
+            "description": "Width of the PCB in mm."
+        },
+        "pcb_height": {
+            "type": ["number", "null"],
+            "description": "Height of the PCB in mm."
+        },
+        "pcb_top_left_coordinates": {
+            "oneOf": [
+                {
+                    "$ref": "#/$defs/coordinate"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "description": "Coordinates of the top left corner of the PCB, in the PCB editor's own coordinate system."
+        },
+        "pcb_left_switch_center_x_coordinate": {
+            "type": ["number", "null"],
+            "description": "X coordinate of the centre of the left most switch."
+        },
+        "pcb_top_switch_center_y_coordinate": {
+            "type": ["number", "null"],
+            "description": "Y coordinate of the centre of the top most switch."
+        },
+        "pcb_case_top_margin": {
+            "type": ["number", "null"],
+            "description": "Space in mm between the top edge of the PCB and the inside of the case wall."
+        },
+        "pcb_case_bottom_margin": {
+            "type": ["number", "null"],
+            "description": "Space in mm between the bottom edge of the PCB and the inside of the case wall."
+        },
+        "pcb_case_left_margin": {
+            "type": ["number", "null"],
+            "description": "Space in mm between the left edge of the PCB and the inside of the case wall."
+        },
+        "pcb_case_right_margin": {
+            "type": ["number", "null"],
+            "description": "Space in mm between the right edge of the PCB and the inside of the case wall."
+        },
+
+        "simple_test": {
+            "type": "boolean",
+            "description": "Render a simplified model, for quick test renders."
+        },
+        "test_block": {
+            "type": "boolean",
+            "description": "Intersect the model with a block, to render only part of it for inspection."
+        },
+        "test_block_x_start": {
+            "type": "number",
+            "description": "Lower x bound in mm of the test block."
+        },
+        "test_block_x_end": {
+            "type": "number",
+            "description": "Upper x bound in mm of the test block."
+        },
+        "test_block_y_start": {
+            "type": "number",
+            "description": "Lower y bound in mm of the test block."
+        },
+        "test_block_y_end": {
+            "type": "number",
+            "description": "Upper y bound in mm of the test block."
+        },
+        "test_block_z_start": {
+            "type": "number",
+            "description": "Lower z bound in mm of the test block."
+        },
+        "test_block_z_end": {
+            "type": "number",
+            "description": "Upper z bound in mm of the test block."
+        }
+    },
+
+    "$defs": {
+        "coordinate": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+                "type": "number"
+            }
+        },
+        "screw_hole_coordinate": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 3,
+            "prefixItems": [
+                {
+                    "type": "number"
+                },
+                {
+                    "type": "number"
+                },
+                {
+                    "enum": ["h", "v"],
+                    "description": "Direction of the support that braces the screw boss: h for horizontal, v for vertical."
+                }
+            ]
+        },
+        "points": {
+            "type": "array",
+            "minItems": 3,
+            "items": {
+                "$ref": "#/$defs/coordinate"
+            }
+        },
+        "path": {
+            "type": "array",
+            "items": {
+                "type": "integer",
+                "minimum": 0
+            }
+        },
+        "custom_polygon": {
+            "type": "object",
+            "required": ["type", "coordinates"],
+            "properties": {
+                "type": {
+                    "enum": ["circle", "rectangle", "polygon"]
+                },
+                "coordinates": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/$defs/coordinate"
+                    },
+                    "description": "Where to place the shape, as x, y distances from the bottom left of the keyboard. One entry per copy of the shape."
+                }
+            },
+            "oneOf": [
+                {
+                    "properties": {
+                        "type": {
+                            "const": "circle"
+                        },
+                        "r": {
+                            "type": "number",
+                            "exclusiveMinimum": 0,
+                            "description": "Radius in mm."
+                        },
+                        "d": {
+                            "type": "number",
+                            "exclusiveMinimum": 0,
+                            "description": "Diameter in mm. Used only when r is absent."
+                        },
+                        "coordinates": true
+                    },
+                    "additionalProperties": false,
+                    "anyOf": [
+                        {
+                            "required": ["r"]
+                        },
+                        {
+                            "required": ["d"]
+                        }
+                    ]
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "const": "rectangle"
+                        },
+                        "width": {
+                            "type": "number",
+                            "exclusiveMinimum": 0,
+                            "description": "Width in mm. Giving only one of width and height makes a square."
+                        },
+                        "height": {
+                            "type": "number",
+                            "exclusiveMinimum": 0,
+                            "description": "Height in mm. Giving only one of width and height makes a square."
+                        },
+                        "coordinates": true
+                    },
+                    "additionalProperties": false,
+                    "anyOf": [
+                        {
+                            "required": ["width"]
+                        },
+                        {
+                            "required": ["height"]
+                        }
+                    ]
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "const": "polygon"
+                        },
+                        "points": {
+                            "$ref": "#/$defs/points",
+                            "description": "x, y coordinates of the vertices, relative to the shape's own origin."
+                        },
+                        "path": {
+                            "$ref": "#/$defs/path",
+                            "description": "Order in which the points are traversed. Omit to use the order they are listed in."
+                        },
+                        "coordinates": true
+                    },
+                    "additionalProperties": false,
+                    "required": ["points"]
+                }
+            ]
+        }
+    }
+}

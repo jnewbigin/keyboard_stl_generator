@@ -1,21 +1,43 @@
 import logging
 import math
 import sys
-from pathlib import PurePath
+from collections.abc import Sequence
+from pathlib import Path, PurePath
+
+import json5
 
 from switch_config import SwitchConfig
 
 
 # from cell import Cell
 
+logger = logging.getLogger(__name__)
+
 
 class Parameters():
 
     # SWITCH_SPACING = 19.05
 
+    # Keys consumed by the loader itself rather than set as attributes.
+    INCLUDE_KEY = 'include'
+    SCHEMA_KEY = '$schema'
+
+    PARAMETER_FILE_SUFFIXES = ('.json', '.json5')
+
+    # Parameters handled by build_attr_from_dict rather than set directly.
+    SPECIAL_PARAMETERS = ('custom_switch',)
+
+    # Parameters that were renamed. The old names are not accepted; this only
+    # points at the replacement when an old name turns up in a parameter file.
+    RENAMED_PARAMETERS = {
+        'plate_wall_thickness': 'case_wall_thickness',
+        'hole_width': 'cable_hole_width',
+        'hole_height': 'cable_hole_height'
+    }
+
     def __init__(self, parameter_dict: dict | None = None) -> None:
 
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
 
         self.parameter_dict = parameter_dict
 
@@ -60,10 +82,6 @@ class Parameters():
         #     'hole_height': 10,
         #     'cable_hole_down_offset': 1
         # }
-
-        self.paramater_alternate_dict = {
-            'plate_wall_thickness': 'case_wall_thickness'
-        }
 
         self.switch_spacing = 19.05
 
@@ -238,7 +256,7 @@ class Parameters():
         self.max_y = max_y
         self.logger.debug('min_x: %f, max_x: %f, max_y: %f, min_y: %f', self.min_x, self.max_x, self.max_y, self.min_y)
 
-        # Get rhe calculated real max and y sizes of the board
+        # Get the calculated real max x and y sizes of the board
         self.real_max_x = self.U(self.max_x)
         self.real_max_y = self.U(abs(self.min_y))
 
@@ -307,19 +325,10 @@ class Parameters():
 
     def build_attr_from_dict(self, parameter_dict: dict) -> None:
 
-        for param in parameter_dict.keys():
-            ignore_deprecated = False
-            value = parameter_dict[param]
+        self.check_parameter_names(parameter_dict)
 
-            # If the current parameter has been deprecated by another parameter get the new parameter name
-            if param in self.paramater_alternate_dict.keys():
-                alt_param = self.paramater_alternate_dict[param]
-                # If the new version of the parameter is not in the paramter dict then us the value in the deprectaed parameter
-                if alt_param not in parameter_dict.keys():
-                    param = alt_param
-                else:
-                    # If the new version of the parameter is in the dict then ignore the current deprecated parameter
-                    ignore_deprecated = True
+        for param in parameter_dict.keys():
+            value = parameter_dict[param]
 
             if param == 'custom_switch':
                 if 'points' not in value.keys():
@@ -335,8 +344,7 @@ class Parameters():
 
                 self.custom_shape = True
 
-            if ignore_deprecated == False:
-                setattr(self, param, value)
+            setattr(self, param, value)
 
         self.switch_config = SwitchConfig(kerf=self.kerf, switch_type=self.switch_type,
                                           stabilizer_type=self.stabilizer_type, custom_shape=self.custom_shape,
@@ -347,18 +355,150 @@ class Parameters():
 
         self.validate_parameters()
 
+    def check_parameter_names(self, parameter_dict: dict) -> None:
+        # Every parameter has an attribute of the same name set up in __init__,
+        # so anything else is a typo or a name that no longer exists. Setting it
+        # would otherwise be silently ignored and the default used instead.
+        known_names = set(self.__dict__.keys()) | set(self.SPECIAL_PARAMETERS)
+
+        problems = []
+        for name in parameter_dict.keys():
+            if name in known_names:
+                continue
+
+            if name in self.RENAMED_PARAMETERS.keys():
+                problems.append('%s was renamed to %s' % (name, self.RENAMED_PARAMETERS[name]))
+            else:
+                problems.append('%s is not a parameter' % (name))
+
+        if len(problems) > 0:
+            raise ValueError('Unknown parameters: %s' % ('; '.join(problems)))
+
     def set_parameter_dict(self, parameter_dict: dict) -> None:
         self.parameter_dict = parameter_dict
         self.build_attr_from_dict(self.parameter_dict)
 
-    # def get_param(self, paramaeter_name):
+    @classmethod
+    def load_parameter_files(cls, file_paths: Sequence[str | PurePath]) -> dict:
+        # Flatten one or more parameter files, and everything they include, into
+        # a single dict. Merging is shallow and later always wins: files are
+        # merged in the order given, and within a file the includes are merged
+        # in list order before the file's own keys, so a file always overrides
+        # what it includes.
+        if isinstance(file_paths, (str, PurePath)):
+            raise TypeError('load_parameter_files takes a list of parameter files, not a single %s. '
+                            'Pass [%r] instead' % (type(file_paths).__name__, str(file_paths)))
 
-    #     if self.parameter_dict is not None and paramaeter_name in self.parameter_dict.keys():
-    #         return self.parameter_dict[paramaeter_name]
-    #     elif paramaeter_name in self.default_parameter_dict.keys():
-    #         return self.default_parameter_dict[paramaeter_name]
+        # A file reached down more than one include path is only resolved once.
+        resolved_files: dict[Path, dict] = {}
+
+        parameter_dict: dict = {}
+        for file_path in file_paths:
+            parameter_dict.update(cls.resolve_parameter_file(Path(file_path), [], resolved_files))
+
+        return parameter_dict
+
+    @classmethod
+    def resolve_parameter_file(cls, file_path: Path, include_chain: list[Path],
+                               resolved_files: dict[Path, dict] | None = None) -> dict:
+        if resolved_files is None:
+            resolved_files = {}
+
+        real_path = file_path.resolve()
+
+        if real_path in include_chain:
+            chain = ' -> '.join(str(path) for path in include_chain + [real_path])
+            raise ValueError('Circular parameter file include: %s' % (chain))
+
+        if real_path in resolved_files:
+            return dict(resolved_files[real_path])
+
+        cls.check_parameter_file(file_path, include_chain)
+
+        logger.debug('Read parameter file %s', file_path)
+        file_text = cls.read_parameter_file(file_path)
+
+        try:
+            # Parse with json5 so the parameter file may contain // and /* */
+            # comments and trailing commas. json5 is a strict superset of JSON,
+            # so plain JSON parameter files keep working unchanged.
+            file_dict = json5.loads(file_text)
+        except ValueError as error:
+            raise ValueError('Failed to parse parameter file %s: %s' % (file_path, error)) from error
+
+        if isinstance(file_dict, dict) == False:
+            raise TypeError('Parameter file %s must contain a JSON object' % (file_path))
+
+        file_dict.pop(cls.SCHEMA_KEY, None)
+        include_names = cls.include_names(file_dict.pop(cls.INCLUDE_KEY, []), file_path)
+
+        parameter_dict: dict = {}
+        for include_name in include_names:
+            # Includes are resolved against the including file so a shared set
+            # of base files can be included from anywhere.
+            include_path = file_path.parent / include_name
+            parameter_dict.update(cls.resolve_parameter_file(include_path, include_chain + [real_path],
+                                                             resolved_files))
+
+        parameter_dict.update(file_dict)
+
+        resolved_files[real_path] = parameter_dict
+
+        return dict(parameter_dict)
+
+    @classmethod
+    def check_parameter_file(cls, file_path: Path, include_chain: list[Path]) -> None:
+        if len(include_chain) > 0:
+            described = 'Parameter file %s included from %s' % (file_path, include_chain[-1])
+        else:
+            described = 'Parameter file %s' % (file_path)
+
+        if file_path.is_dir():
+            raise IsADirectoryError('%s is a directory, not a parameter file' % (described))
+
+        if file_path.exists() == False:
+            raise FileNotFoundError('%s does not exist' % (described))
+
+        if file_path.is_file() == False:
+            raise ValueError('%s is not a regular file' % (described))
+
+        if file_path.suffix not in cls.PARAMETER_FILE_SUFFIXES:
+            raise ValueError('%s must be named %s'
+                             % (described, ' or '.join(cls.PARAMETER_FILE_SUFFIXES)))
+
+    @classmethod
+    def include_names(cls, include_value: object, file_path: Path) -> list[str]:
+        names: list[str] = []
+
+        if isinstance(include_value, str):
+            names = [include_value]
+        elif isinstance(include_value, list) and all(isinstance(name, str) for name in include_value):
+            names = list(include_value)
+        else:
+            raise TypeError('"%s" in %s must be a file name or a list of file names'
+                            % (cls.INCLUDE_KEY, file_path))
+
+        for name in names:
+            if name.strip() == '':
+                raise ValueError('"%s" in %s contains an empty file name' % (cls.INCLUDE_KEY, file_path))
+
+        return names
+
+    @staticmethod
+    def read_parameter_file(file_path: Path) -> str:
+        try:
+            return file_path.read_text(encoding='utf-8')
+        except UnicodeDecodeError as error:
+            raise ValueError('Parameter file %s is not utf-8 encoded' % (file_path)) from error
+
+    # def get_param(self, parameter_name):
+
+    #     if self.parameter_dict is not None and parameter_name in self.parameter_dict.keys():
+    #         return self.parameter_dict[parameter_name]
+    #     elif parameter_name in self.default_parameter_dict.keys():
+    #         return self.default_parameter_dict[parameter_name]
     #     else:
-    #         raise ValueError('No paramter exists with name %s' % (paramaeter_name))
+    #         raise ValueError('No parameter exists with name %s' % (parameter_name))
 
     def validate_parameters(self) -> None:
         assert self.switch_config is not None

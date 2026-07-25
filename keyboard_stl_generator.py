@@ -4,7 +4,6 @@ import argparse
 from collections.abc import Sequence
 from typing import Any
 import json
-import json5
 # import math
 import re
 import logging
@@ -49,7 +48,7 @@ console_handler.setFormatter(console_formatter)
 # Add console handler to logger
 logger.addHandler(console_handler)
 
-# Get file info that will be used to creat log file
+# Get file info that will be used to create log file
 script_location = Path(os.path.dirname(os.path.realpath(__file__)))
 log_file_name = 'generator.log'
 log_file_path = script_location / log_file_name
@@ -65,8 +64,8 @@ file_handler.setFormatter(file_formatter)
 logger.addHandler(file_handler)
 
 
-# Helper for parser to wnsure filename argument has to correct extension
-def CheckExt(choices: set[str]) -> type[argparse.Action]:
+# Helper for parser to ensure filename argument has the correct extension
+def CheckExt(choices: set[str], append: bool = False) -> type[argparse.Action]:
     class Act(argparse.Action):
         def __call__(self, parser: argparse.ArgumentParser, namespace: argparse.Namespace, fname: str | Sequence[Any] | None, option_string: str | None = None) -> None:
             assert isinstance(fname, str)
@@ -74,6 +73,10 @@ def CheckExt(choices: set[str]) -> type[argparse.Action]:
             if ext not in choices:
                 option_string = '({})'.format(option_string) if option_string else ''
                 parser.error("file doesn't end with one of {}{}".format(choices,option_string))
+            elif append:
+                file_names = list(getattr(namespace, self.dest, None) or [])
+                file_names.append(fname)
+                setattr(namespace, self.dest, file_names)
             else:
                 setattr(namespace,self.dest,fname)
 
@@ -83,16 +86,18 @@ def CheckExt(choices: set[str]) -> type[argparse.Action]:
 
 def main() -> None:
 
+    parameter_file_extensions = {suffix.lstrip('.') for suffix in Parameters.PARAMETER_FILE_SUFFIXES}
+
     parser = argparse.ArgumentParser(description='Build custom keyboard SCAD file using keyboard layout editor format')
     parser.add_argument('-i', '--input-file', metavar = 'layout_json_file_name.json', help = 'A path to a keyboard layout editor json file', required = True, action=CheckExt({'json'}))
     # parser.add_argument('-o', '--output-folder', metavar = 'scad', help = 'A path to a folder to store the generated open scad file')
-    parser.add_argument('-p', '--parameter-file', metavar = 'parameters.json', help = 'A JSON file containing paramters for the object buing made', default = None, action=CheckExt({'json'}))
+    parser.add_argument('-p', '--parameter-file', metavar = 'parameters.json', help = 'A JSON file containing parameters for the object being made. May be given more than once, in which case later files override earlier ones', default = None, action=CheckExt(parameter_file_extensions, append = True))
     parser.add_argument('-s', '--section', metavar = 'section_num', help = 'The number of the section that should be built', type = int, default = -1)
     parser.add_argument('-a', '--all-sections', help = 'Output all the parts for all possible sections in separate files', default = False, action = 'store_true')
     parser.add_argument('-e', '--exploded', help = 'Create test file with each section shown as an exploded view', default = False, action = 'store_true')
     parser.add_argument('-f', '--fragments', metavar = 'num_fragments', help = 'The number of fragments to be used when creating curves', type = int, default = 20)
     parser.add_argument('-r', '--render', help = 'Render an STL from the generated scad file', default = False, action = 'store_true')
-    parser.add_argument('--switch-type-in-filename', help = 'Add the switch type name and stabilizer type name to the filname', default = False, action = 'store_true')
+    parser.add_argument('--switch-type-in-filename', help = 'Add the switch type name and stabilizer type name to the filename', default = False, action = 'store_true')
 
     # Parse command line arguments
     args = parser.parse_args()
@@ -104,7 +109,7 @@ def main() -> None:
     # Get base folder path
     base_path = input_file_path.parent
 
-    # Get input file name onle
+    # Get input file name only
     file_name_only = input_file_path.name
     
     # Get layout name from file name
@@ -115,7 +120,7 @@ def main() -> None:
     scad_folder_path = output_base_folder / 'scad'
     stl_folder_path = output_base_folder / 'stl'
 
-    # Ensure all outpur folders exists
+    # Ensure all output folders exist
     if output_base_folder.is_dir() == False:
         output_base_folder.mkdir()
 
@@ -142,26 +147,18 @@ def main() -> None:
     json_key_replace = '\\1"\\2":'
 
     # Open JSON layout file
-    logger.debug('Open layout file %s', input_file_path)
-    try:
-        # Try with utf-8 encoding specified
-        f = open(input_file_path, encoding="utf-8")
-    except:
-        # Failed to open
-        logger.info('Failed to open layout file with utf-8 encoding specified. Try opening without specifying an encoding')
-        try:
-            # Try opening with no encoding spcificed
-            f = open(input_file_path)
-        except:
-            logger.error('Failed to open layout file both spefifying utf-8 andcoding and not specifying any encodeing. Exiting')
-            exit(1)
-
     logger.debug('Read layout JSON string from file %s', input_file_path)
     try:
-        keyboard_layout = f.read()
+        keyboard_layout = input_file_path.read_text(encoding='utf-8')
     except UnicodeDecodeError:
-        logger.error('Unable to decode layout file. Please provide utf-8 encoded files')
-        exit(-1)
+        message = 'Layout file %s is not utf-8 encoded' % (input_file_path)
+        logger.error(message)
+        print('ERROR:', message)
+        exit(1)
+    except OSError as error:
+        logger.error('Failed to read layout file: %s', error)
+        print('ERROR:', error)
+        exit(1)
 
     keyboard_layout_dict = None
 
@@ -173,7 +170,7 @@ def main() -> None:
         logger.debug('Valid Json Parsed')
     except:
         # Failed to parse the JSON test.
-        # This most likely means that the keybaord-layout-editor raw output was provided
+        # This most likely means that the keyboard-layout-editor raw output was provided
         # Attempt to modify that string to make it valid JSON
         keyboard_layout = '[%s]' % (keyboard_layout)
         keyboard_layout = re.sub(json_key_pattern, json_key_replace, keyboard_layout)
@@ -187,48 +184,27 @@ def main() -> None:
     logger.debug('keyboard_layout_dict: %s', str(keyboard_layout_dict))
 
 
-    # Read parameter file
+    # Read parameter files
     parameter_dict = None
     if args.parameter_file is not None:
-        # Open JSON parameter file
-        logger.debug('Open parameter file %s', args.parameter_file)
+        logger.debug('Load parameter files %s', args.parameter_file)
         try:
-            # Try with utf-8 encoding specified
-            f = open(args.parameter_file, encoding="utf-8")
-        except:
-            # Failed to open
-            logger.info('Failed to open parameter file with utf-8 encoding specified. Try opening without specifying an encoding')
-            try:
-                # Try opening with no encoding spcificed
-                f = open(args.parameter_fil)
-            except:
-                logger.error('Failed to open parameter file both spefifying utf-8 andcoding and not specifying any encodeing. Exiting')
-                exit(1)
-        
-
-        logger.debug('Read JSON string from parameter file %s', args.parameter_file)
-        try:
-             parameter_file_text = f.read()
-        except UnicodeDecodeError:
-            logger.error('Unable to decode parameter file. Please provide utf-8 encoded files')
-            exit(-1)
-       
-        logger.debug('Parse parameter JSON string')
-        try:
-            # Parse with json5 so the parameter file may contain // and /* */
-            # comments and trailing commas. json5 is a strict superset of JSON,
-            # so plain JSON parameter files keep working unchanged.
-            parameter_dict = json5.loads(parameter_file_text)
-            logger.debug('Valid Json Parsed')
-        except:
-            logger.error('Failed to parse parameter JSON file.')
-            raise
+            parameter_dict = Parameters.load_parameter_files(args.parameter_file)
+        except (OSError, TypeError, ValueError) as error:
+            logger.error('Failed to load parameter files: %s', error)
+            print('ERROR:', error)
+            exit(1)
 
         logger.debug('parameter_dict: %s', str(parameter_dict))
 
 
-    # Set parameters from imput file
-    parameters = Parameters(parameter_dict)
+    # Set parameters from input file
+    try:
+        parameters = Parameters(parameter_dict)
+    except (AttributeError, TypeError, ValueError) as error:
+        logger.error('Failed to apply parameters: %s', error)
+        print('ERROR:', error)
+        exit(1)
     
     # Create Keyboard instance
     keyboard = Keyboard(parameters)
@@ -315,7 +291,7 @@ def main() -> None:
         solid_object_dict['all']['plate'] = render() ( keyboard.get_assembly(plate_only = True) )
         solid_object_dict['all']['case_bottom'] = render() ( keyboard.get_assembly(case_bottom = True) )
     
-    # Add global items that are not dependant on the sctions or parts of the item to build
+    # Add global items that are not dependent on the sections or parts of the item to build
     solid_object_dict['global'] = {}
 
     # Generate a strain relief piece for the cable hole
@@ -352,7 +328,7 @@ def main() -> None:
 
         section_postfix = ''
 
-        # Creating global items that have no relaton to switch type
+        # Creating global items that have no relation to switch type
         if isinstance(section, str) and section == 'global':
             switch_type_for_filename = ''
             stab_type_for_filename = ''
