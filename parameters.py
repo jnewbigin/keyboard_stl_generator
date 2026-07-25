@@ -91,6 +91,7 @@ class Parameters():
         self.plate_supports = True
         self.support_bar_height = 3.0
         self.support_bar_width = 3.0
+        self.support_bar_fillet = 0.5
 
         self.top_margin = 10.0
         self.bottom_margin = 10.0
