@@ -454,5 +454,8 @@ def main() -> None:
         print('    Section %d: %.1f x %.1f mm%s'
               % (section_number, width, height, '' if fits else '  (exceeds build plate!)'))
 
+    if keyboard.split_recommendation is not None:
+        print('\n' + keyboard.split_recommendation)
+
 if __name__ == "__main__":
     main()
