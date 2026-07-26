@@ -13,7 +13,8 @@ from solid.utils import *
 from switch import Switch
 from support import Support
 from support_cutout import SupportCutout
-from cell import Cell
+from cell import Cell, CellProperties
+from support_properties import SupportProperties
 from item_collection import ItemCollection
 from rotation_collection import RotationCollection
 from body import Body
@@ -38,6 +39,8 @@ class Keyboard():
         self.kerf = self.parameters.kerf
 
         self.body: Body | None = None
+
+        self.pcb: PCB | None = None
 
         self.desired_section_number = -1
 
@@ -92,9 +95,7 @@ class Keyboard():
         rx = 0.0
         ry = 0.0
         z_offset = 0.0
-        # r_x_offset = 0.0
-        # r_y_offset = 0.0
-        
+
         for row in keyboard_layout_dict:
             x = 0.0
             w = 1.0
@@ -129,10 +130,8 @@ class Keyboard():
                                     h = size
                                 if modifier_type == 'x':
                                     x += size
-                                    r_x_offset = size
                                 if modifier_type == 'y':
                                     y += size
-                                    r_y_offset = size
                                 if modifier_type == 'r':
                                     rotation = size
                                     y = 0
@@ -154,9 +153,12 @@ class Keyboard():
                         x_offset = x
                         y_offset = -(y)
 
-                        switch = Switch(x_offset, y_offset, w, h, rotation = rotation, z_offset = z_offset, cell_value = col_escaped, switch_config = self.switch_config, parameters = self.parameters)
-                        support = Support(x_offset, y_offset, w, h, self.parameters.plate_thickness, self.parameters.support_bar_height, self.parameters.support_bar_width, support_bar_fillet = self.parameters.support_bar_fillet, rotation = rotation, z_offset = z_offset, parameters = self.parameters)
-                        support_cutout = SupportCutout(x_offset, y_offset, w, h, self.parameters.plate_thickness, self.parameters.support_bar_height, self.parameters.support_bar_width, rotation = rotation, z_offset = z_offset, parameters = self.parameters)
+                        switch_props = CellProperties(x_offset, y_offset, w, h, rotation = rotation, z_offset = z_offset, cell_value = col_escaped)
+                        support_props = CellProperties(x_offset, y_offset, w, h, rotation = rotation, z_offset = z_offset)
+
+                        switch = Switch(switch_props, self.parameters, switch_config = self.switch_config)
+                        support = Support(support_props, SupportProperties.from_parameters(self.parameters), self.parameters)
+                        support_cutout = SupportCutout(support_props, SupportProperties.from_parameters(self.parameters, set_to_origin = False), self.parameters)
 
                         # Create switch cutout and support object without rotation
                         if rotation == 0.0:
@@ -197,7 +199,7 @@ class Keyboard():
                     x = coordinates[0]
                     y = coordinates[1]
 
-                    custom_shape = ShapeCutout(x, y, custom_shape_type, shape, self.parameters)
+                    custom_shape = ShapeCutout(CellProperties(x, y), custom_shape_type, shape, self.parameters)
                     self.custom_polygon_collection.add_item(x, y, custom_shape)
 
 

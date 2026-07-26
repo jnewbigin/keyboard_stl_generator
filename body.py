@@ -8,8 +8,9 @@ from solid.utils import *
 
 import logging
 
-from cell import Cell
+from cell import Cell, CellProperties
 from support import Support
+from support_properties import SupportProperties
 from parameters import Parameters
 
 
@@ -65,6 +66,8 @@ class Body():
 
         # if self.parameter_dict is not None:
         #     self.build_attr_from_dict(self.parameter_dict)
+
+        self.parameter_dict: dict | None = None
 
         self.screw_hole_coordinates: list = []
 
@@ -284,7 +287,8 @@ class Body():
                     y_offset = -y
                     
                     # Add support object to plate
-                    plate_object += Support(x_offset, y_offset, w, h, self.plate_thickness, self.support_bar_height, self.support_bar_width, parameters = self.parameters).get_moved()
+                    support_props = SupportProperties(self.plate_thickness, self.support_bar_height, self.support_bar_width)
+                    plate_object += Support(CellProperties(x_offset, y_offset, w, h), support_props, self.parameters).get_moved()
 
         # eturn palte object
         return plate_object

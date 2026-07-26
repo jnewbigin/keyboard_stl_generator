@@ -6,7 +6,7 @@ from solid.utils import *
 import logging
 import sys
 
-from cell import Cell
+from cell import Cell, CellProperties
 from parameters import Parameters
 from switch_config import SwitchConfig
 
@@ -39,12 +39,10 @@ class ShapeCutout(Cell):
     }
 
 
-    def __init__(self, x: float, y: float, shape_type: str, shape_parameters: dict, parameters: Parameters = Parameters()) -> None:
-        super().__init__(x, y, parameters = parameters)
+    def __init__(self, props: CellProperties, shape_type: str, shape_parameters: dict, parameters: Parameters) -> None:
+        super().__init__(props, parameters)
 
         self.logger = logging.getLogger().getChild(__name__)
-
-        self.parameters: Parameters = parameters
 
         self.shape_type = shape_type
         self.shape_parameters = shape_parameters

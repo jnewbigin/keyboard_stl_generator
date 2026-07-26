@@ -6,7 +6,7 @@ import logging
 import sys
 from typing import Any
 
-from cell import Cell
+from cell import Cell, CellProperties
 from parameters import Parameters
 from switch_config import SwitchConfig
 
@@ -18,35 +18,15 @@ class Switch(Cell):
 
     Attributes
     ----------
-    x : float
-        The x coorinate of the top left of the switch in keyboard layout U units
+    props : CellProperties
+        position, size, rotation, z offset and key text of the switch in
+        keyboard layout U units
 
-    y : float
-        The y coorinate of the top left of the switch in keyboard layout U units
-
-    w : float
-        The width of the switch in keyboard layout U units
-
-    h : float
-        The height of the switch in keyboard layout U units
-
-    rotation : float, default 0.0
-        The angle the switch will be rotated to
-
-    r_x_offset : float, default 0.0
-        The x offset from origin tha tthe rotation oriin will be moved to
-
-    r_y_offset : float, default 0.0
-        The y offset from origin tha tthe rotation oriin will be moved to
-
-    cell_value : float, default ''
-        The actual text of the key
+    parameters : Parameters
+        object containing parameter settings
 
     switch_config : SwitchConfig, default None
         config opbject for switch
-
-    parameters : Parameters, default None
-        object containing parameter settings
 
     Methods
     -------
@@ -78,16 +58,14 @@ class Switch(Cell):
     }
 
 
-    def __init__(self, x: float, y: float, w: float, h: float, rotation: float = 0.0,  r_x_offset: float = 0.0, r_y_offset: float = 0.0, z_offset: float = 0.0, cell_value: str = '', switch_config: SwitchConfig | None = None, parameters: Parameters = Parameters()) -> None:
-        super().__init__(x, y, w, h, rotation,  r_x_offset, r_y_offset, z_offset = z_offset, cell_value = cell_value, parameters = parameters)
+    def __init__(self, props: CellProperties, parameters: Parameters, switch_config: SwitchConfig | None = None) -> None:
+        super().__init__(props, parameters)
 
         self.logger = logging.getLogger().getChild(__name__)
 
         self.switch_config = switch_config
         if self.switch_config is None:
             self.switch_config = SwitchConfig()
-
-        self.parameters: Parameters = parameters
 
         self.solid = self.switch_cutout()
 
