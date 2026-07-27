@@ -10,6 +10,7 @@ import re
 
 # import os.path
 import subprocess
+import sys
 from collections.abc import Sequence
 from typing import Any
 
@@ -20,7 +21,6 @@ from solid.utils import *
 from cable import Cable
 from keyboard import Keyboard
 from parameters import Parameters
-import sys
 
 # Preview colors given to each section so the pieces are distinguishable in the
 # per-section, exploded and assembled scad views. color() only affects the

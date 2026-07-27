@@ -1,12 +1,12 @@
 import logging
 import math
+import sys
 from collections.abc import Sequence
 from pathlib import Path, PurePath
 
 import json5
 
 from switch_config import SwitchConfig
-import sys
 
 # from cell import Cell
 
@@ -213,7 +213,7 @@ class Parameters:
         ]
         for attr_name in self.__dict__:
             if attr_name not in ignore_attr_names:
-                output += f'{attr_name}: {str(self.__dict__[attr_name])}\n'
+                output += f'{attr_name}: {self.__dict__[attr_name]!s}\n'
 
         return output
 
@@ -447,10 +447,7 @@ class Parameters:
 
     @classmethod
     def check_parameter_file(cls, file_path: Path, include_chain: list[Path]) -> None:
-        if len(include_chain) > 0:
-            described = f'Parameter file {file_path} included from {include_chain[-1]}'
-        else:
-            described = f'Parameter file {file_path}'
+        described = f'Parameter file {file_path} included from {include_chain[-1]}' if len(include_chain) > 0 else f'Parameter file {file_path}'
 
         if file_path.is_dir():
             raise IsADirectoryError(f'{described} is a directory, not a parameter file')
