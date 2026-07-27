@@ -99,6 +99,7 @@ metrics (argument counts, statement counts and so on) are pylint's job, so the
 
 ### Schema
 - [parameters.schema.json](/parameters.schema.json) describes every parameter, so an editor can offer completion and flag mistakes as you type. The program itself also rejects a parameter it does not recognise, rather than building the model from the default
+- The program checks every parameter file against the same schema as it loads, so a value of the wrong type or outside the allowed range is reported by name instead of being used. A quoted `"false"` is a string rather than a boolean, and would otherwise turn a feature on
 - Point an editor at it by adding a `$schema` key to the parameter file
   ```
   {

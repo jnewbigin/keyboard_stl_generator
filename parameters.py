@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from pathlib import Path, PurePath
 
 import json5
+import jsonschema
 
 from switch_config import SwitchConfig
 
@@ -20,6 +21,10 @@ class Parameters:
     # Keys consumed by the loader itself rather than set as attributes.
     INCLUDE_KEY = 'include'
     SCHEMA_KEY = '$schema'
+
+    SCHEMA_PATH = Path(__file__).resolve().parent / 'parameters.schema.json'
+
+    _schema: dict | None = None
 
     PARAMETER_FILE_SUFFIXES = ('.json', '.json5')
 
@@ -325,6 +330,7 @@ class Parameters:
     def build_attr_from_dict(self, parameter_dict: dict) -> None:
 
         self.check_parameter_names(parameter_dict)
+        self.check_parameter_types(parameter_dict)
 
         for param in parameter_dict:
             value = parameter_dict[param]
@@ -353,6 +359,30 @@ class Parameters:
         self.update_calculated_attributes()
 
         self.validate_parameters()
+
+    @classmethod
+    def schema(cls) -> dict:
+        if cls._schema is None:
+            cls._schema = json5.loads(cls.SCHEMA_PATH.read_text(encoding='utf-8'))
+        return cls._schema
+
+    @classmethod
+    def check_parameter_types(cls, parameter_dict: dict) -> None:
+        # Values reach attributes through setattr, so nothing else checks that
+        # what a parameter file supplies is the right type. A string "false"
+        # would otherwise read as enabled at every truth test.
+        validator = jsonschema.Draft202012Validator(cls.schema())
+
+        problems = []
+        for error in sorted(validator.iter_errors(parameter_dict), key=str):
+            if error.absolute_path:
+                name = '.'.join(str(part) for part in error.absolute_path)
+                problems.append(f'{name}: {error.message}')
+            else:
+                problems.append(error.message)
+
+        if len(problems) > 0:
+            raise ValueError('Invalid parameters: {}'.format('; '.join(problems)))
 
     def check_parameter_names(self, parameter_dict: dict) -> None:
         # Every parameter has an attribute of the same name set up in __init__,

@@ -150,9 +150,17 @@ class TestCableHoleWidthBounds:
         with pytest.raises(SystemExit):
             make_parameters(cable_hole_width=400).validate_cable_hole()
 
-    def test_zero_width_is_rejected(self):
+    def test_zero_width_is_rejected_on_load(self):
+        with pytest.raises(ValueError, match='cable_hole_width'):
+            make_parameters(cable_hole_width=0)
+
+    def test_zero_width_is_rejected_by_validate(self):
+        # The schema stops a zero reaching this from a parameter file, so set
+        # the attribute directly to reach the guard behind it.
+        parameters = make_parameters()
+        parameters.cable_hole_width = 0
         with pytest.raises(SystemExit):
-            make_parameters(cable_hole_width=0).validate_cable_hole()
+            parameters.validate_cable_hole()
 
 
 class TestCableHoleHeightBounds:
@@ -171,9 +179,15 @@ class TestCableHoleHeightBounds:
         with pytest.raises(SystemExit):
             make_parameters(cable_hole_height=13, cable_hole_down_offset=4).validate_cable_hole()
 
-    def test_zero_height_is_rejected(self):
+    def test_zero_height_is_rejected_on_load(self):
+        with pytest.raises(ValueError, match='cable_hole_height'):
+            make_parameters(cable_hole_height=0)
+
+    def test_zero_height_is_rejected_by_validate(self):
+        parameters = make_parameters()
+        parameters.cable_hole_height = 0
         with pytest.raises(SystemExit):
-            make_parameters(cable_hole_height=0).validate_cable_hole()
+            parameters.validate_cable_hole()
 
 
 class TestParametersCableHoleCenter:
