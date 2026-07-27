@@ -33,7 +33,7 @@
     "screw_edge_inset": 7,
 
     "cable_hole": false,
-    "hole_width": 10,
-    "hole_height": 10,
+    "cable_hole_width": 10,
+    "cable_hole_height": 10,
     "cable_hole_down_offset": 1
 }

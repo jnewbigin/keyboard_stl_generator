@@ -1,5 +1,4 @@
 {
-    "plate_only": false,
     "plate_supports": true,
 
     "stabilizer_type": "costar",
@@ -26,8 +25,8 @@
     "cable_hole": true,
     "cable_hole_up_offset": 0,
     "cable_hole_down_offset": 1,
-    "hole_width": 10,
-    "hole_height": 5,
+    "cable_hole_width": 10,
+    "cable_hole_height": 5,
 
     "screw_count": 0,
     "screw_diameter": 4,

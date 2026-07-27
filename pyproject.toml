@@ -17,6 +17,7 @@ package-mode = false
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0"
 mypy = "^1.11"
+jsonschema = "^4.26.0"
 
 [tool.mypy]
 python_version = "3.14"
