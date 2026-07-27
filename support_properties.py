@@ -12,7 +12,7 @@ class SupportProperties:
     set_to_origin: bool = True
 
     @classmethod
-    def from_parameters(cls, parameters: Parameters, set_to_origin: bool = True) -> 'SupportProperties':
+    def from_parameters(cls, parameters: Parameters, set_to_origin: bool = True) -> SupportProperties:
         return cls(
             plate_thickness = parameters.plate_thickness,
             support_bar_height = parameters.support_bar_height,

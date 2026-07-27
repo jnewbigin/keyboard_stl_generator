@@ -1,19 +1,15 @@
 # from ast import Param
-import math
-import sys
+
+import logging
 
 from solid import *
 from solid import OpenSCADObject
 from solid.utils import *
 
-import logging
-
-from cell import Cell
-from support import Support
 from parameters import Parameters
 
 
-class PCB():
+class PCB:
 
     def __init__(self, parameters: Parameters = Parameters()) -> None:
 
@@ -35,24 +31,24 @@ class PCB():
         self.pcb_thickness = 1.6
 
         self.pcb_plate_separation = 5
-    
+
 
     def get_model(self, remove_above: bool = False, remove_bellow: bool = False) -> OpenSCADObject:
 
-        if self.custom_pcb == True:
+        if self.custom_pcb:
             assert self.pcb_case_left_margin is not None
             assert self.pcb_case_bottom_margin is not None
             model_height = self.pcb_thickness
             down_offset = self.pcb_thickness + self.pcb_plate_separation
 
-            if remove_above == True:
+            if remove_above:
                 model_height = self.pcb_thickness + self.parameters.case_height_extra
-            elif remove_bellow == True:
+            elif remove_bellow:
                 model_height = self.pcb_thickness + self.parameters.case_height_extra
                 down_offset = down_offset + self.parameters.case_height_extra
 
 
-            pcb_model = right(self.parameters.case_wall_thickness + self.pcb_case_left_margin) ( 
+            return right(self.parameters.case_wall_thickness + self.pcb_case_left_margin) (
                 forward(self.parameters.case_wall_thickness + self.pcb_case_bottom_margin) (
                     down(down_offset) (
                         cube([self.pcb_width, self.pcb_height, model_height])
@@ -60,6 +56,4 @@ class PCB():
                 )
             )
 
-            return pcb_model
-        else:
-            return union()
+        return union()

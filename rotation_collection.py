@@ -1,17 +1,12 @@
+import logging
 from collections.abc import KeysView
 
 from solid import *
 from solid import OpenSCADObject
 from solid.utils import *
 
-import logging
-
-from switch import Switch
-from support import Support
-from support_cutout import SupportCutout
-
-from item_collection import ItemCollection
 from cell import Cell
+from item_collection import ItemCollection
 from parameters import Parameters
 
 
@@ -19,11 +14,11 @@ class RotationCollection:
     def __init__(self, parameters: Parameters = Parameters()) -> None:
 
         self.parameters = parameters
-        
+
         self.logger = logging.getLogger().getChild(__name__)
 
         self.rotation_collection: dict[float, ItemCollection] = {}
-       
+
     # def add_collection(self, x_offset, y_offset, cell: Cell, rx = None, ry = None)
 
     def get_rotation_list(self) -> KeysView:
@@ -31,13 +26,13 @@ class RotationCollection:
 
     def get_collection_dict(self) -> dict:
         return self.rotation_collection
-    
+
     def add_item(self, rotation: float, x_offset: float, y_offset: float, cell: Cell, rx: float = 0.0, ry: float = 0.0) -> None:
-        if rotation not in self.rotation_collection.keys():
+        if rotation not in self.rotation_collection:
             self.rotation_collection[rotation] = ItemCollection(rotation)
 
         self.rotation_collection[rotation].add_item(x_offset, y_offset, cell, rx, ry)
-        
+
     def get_item(self, rotation: float, x_offset: float, y_offset: float, rx: float = 0.0, ry: float = 0.0) -> Cell:
         return self.rotation_collection[rotation].get_item(x_offset, y_offset, rx, ry)
 
@@ -61,12 +56,12 @@ class RotationCollection:
 
     def get_max_x(self, rotation: float, rx: float = 0.0, ry: float = 0.0) -> float:
         return self.rotation_collection[rotation].get_max_x(rx, ry)
-        
+
     def get_min_y(self, rotation: float, rx: float = 0.0, ry: float = 0.0) -> float:
         return self.rotation_collection[rotation].get_min_y(rx, ry)
-    
+
     # def get_moved_(self, rotation, rx, ry):
-    #     return 
+    #     return
 
     def get_real_collection_bounds(self) -> tuple[float, float, float, float]:
         real_min_y = 1000.0
@@ -86,14 +81,10 @@ class RotationCollection:
 
                     # self.logger.debug('rx: %f, ry: %f, min_x: %f, max_x: %f, max_y: %f, min_y: %f', rx, ry, min_x, max_x, max_y, min_y)
 
-                    if min_x < real_min_x:
-                        real_min_x = min_x
-                    if max_x > real_max_x:
-                        real_max_x = max_x
-                    if min_y < real_min_y:
-                        real_min_y = min_y
-                    if max_y > real_max_y:
-                        real_max_y = max_y
+                    real_min_x = min(real_min_x, min_x)
+                    real_max_x = max(real_max_x, max_x)
+                    real_min_y = min(real_min_y, min_y)
+                    real_max_y = max(real_max_y, max_y)
 
         return (real_min_x, real_max_x, real_max_y, real_min_y)
 
@@ -117,10 +108,9 @@ class RotationCollection:
                 # for x in self.get_x_list_in_rx_ry(rotation, rx, ry)
                 #     for y in self.get_y_list_in_rx_ry_x(rotation, x, rx, ry)
                 solid += self.rotation_collection[rotation].get_moved_union(rx, ry)
-        
 
-                solid = rotate(a = -(rotation), v = (0, 0, 1)) ( solid )
-                return solid
+
+                return rotate(a = -(rotation), v = (0, 0, 1)) ( solid )
 
         return None
 
@@ -132,11 +122,11 @@ class RotationCollection:
                 # for x in self.get_x_list_in_rx_ry(rotation, rx, ry)
                 #     for y in self.get_y_list_in_rx_ry_x(rotation, x, rx, ry)
                 solid += self.rotation_collection[rotation].get_moved_union(rx, ry)
-        
+
 
                 solid = rotate(a = -(rotation), v = (0, 0, 1)) ( solid )
                 solid = right(self.parameters.U(rx)) ( back(self.parameters.U(ry)) ( solid ) )
-        
+
         return solid
 
 
@@ -148,5 +138,5 @@ class RotationCollection:
                 # for x in self.get_x_list_in_rx_ry(rotation, rx, ry)
                 #     for y in self.get_y_list_in_rx_ry_x(rotation, x, rx, ry)
                 solid = self.rotation_collection[rotation].draw_rotated_items(rx, ry)
-        
+
         return solid

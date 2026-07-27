@@ -1,14 +1,14 @@
+import logging
+from typing import Any
+
 from solid import *
 from solid import OpenSCADObject
 from solid.utils import *
 
-import logging
-import sys
-from typing import Any
-
 from cell import Cell, CellProperties
 from parameters import Parameters
 from switch_config import SwitchConfig
+
 
 class Switch(Cell):
     """
@@ -69,7 +69,7 @@ class Switch(Cell):
 
         self.solid = self.switch_cutout()
 
-        self.logger.debug('x: %f, y: %f, w: %f, h: %f, end_x: %f, end_y: %f', self.x, self.y, self.w, self.h, self.end_x, self.end_y) 
+        self.logger.debug('x: %f, y: %f, w: %f, h: %f, end_x: %f, end_y: %f', self.x, self.y, self.w, self.h, self.end_x, self.end_y)
 
         self.global_neighbors: dict[str, Any] = {
             'right': {
@@ -101,7 +101,7 @@ class Switch(Cell):
         # self.down_in_section = None
 
         # self.neighbors
-    
+
 
     def neighbors_formatted(self, obj: Any, indent: int = 2, current_indent: int = 0) -> str:
         current_output = ''
@@ -162,13 +162,10 @@ class Switch(Cell):
 
         stab_poly_points, *support_cutout_poly_points = self.switch_config.get_stab_poly_info(key_width = self.switch_length)
 
-        if len(support_cutout_poly_points) == 2:
-            advanced_poly_points = support_cutout_poly_points[1]
-        else:
-            advanced_poly_points = []
+        advanced_poly_points = support_cutout_poly_points[1] if len(support_cutout_poly_points) == 2 else []
         support_cutout_poly_points = support_cutout_poly_points[0]
-        
-        
+
+
         self.logger.debug('\tswitch_poly_points: %d, switch_poly_path: %d', len(switch_poly_points), len(switch_poly_path))
 
         # Create switch cutout polygon
@@ -177,7 +174,7 @@ class Switch(Cell):
         # Create stab polygon if it is defined
         if stab_poly_points is not None:
             stab_poly_path = [range(len(stab_poly_points))]
-            
+
             self.logger.debug('\t\tstab_poly_points: %d, stab_poly_path: %d', len(stab_poly_points), len(stab_poly_path))
             stab = polygon(stab_poly_points, stab_poly_path) + mirror([1, 0, 0]) ( polygon(stab_poly_points, stab_poly_path) )
             # stab = polygon(stab_poly_points, stab_poly_path)# + mirror([1, 0, 0]) ( polygon(stab_poly_points, stab_poly_path) )
@@ -239,12 +236,11 @@ class Switch(Cell):
 
         # Rotate a key if it is taller than it is wide
         if self.vertical:
-            
+
             cutout = rotate(a = -90, v = (0, 0, 1)) ( cutout )
 
-        offset_cutout = right(self.w_mm / 2) ( back(self.h_mm / 2) ( cutout ) )
+        return right(self.w_mm / 2) ( back(self.h_mm / 2) ( cutout ) )
 
-        return offset_cutout
 
 
 
@@ -255,12 +251,11 @@ class Switch(Cell):
         elif neighbor_group == 'global':
             neighbor_dict =  self.global_neighbors
 
-            
+
         all_neighbors_set = True
-        for direction in neighbor_dict.keys():
-            if direction != 'neighbor_check_complete':
-                if len(neighbor_dict[direction].keys()) == 0:
-                    all_neighbors_set = False
+        for direction in neighbor_dict:
+            if direction != 'neighbor_check_complete' and len(neighbor_dict[direction].keys()) == 0:
+                all_neighbors_set = False
 
         neighbor_dict['neighbor_check_complete'] = all_neighbors_set
 
@@ -275,8 +270,8 @@ class Switch(Cell):
         return neighbor_dict['neighbor_check_complete']
 
 
-    def get_neighbor(self, neighbor_name: str, neighbor_group: str = 'local') -> 'Switch | None':
-        
+    def get_neighbor(self, neighbor_name: str, neighbor_group: str = 'local') -> Switch | None:
+
         neighbor = None
 
         if neighbor_group == 'local':
@@ -286,20 +281,20 @@ class Switch(Cell):
 
         return neighbor
 
-    def set_neighbor(self, neighbor: 'Switch | None' = None, neighbor_name: str = '', offset: float = 0.0, has_neighbor: bool = True, neighbor_group: str = 'local', perp_offset: float = 0.0) -> None:
-        
+    def set_neighbor(self, neighbor: Switch | None = None, neighbor_name: str = '', offset: float = 0.0, has_neighbor: bool = True, neighbor_group: str = 'local', perp_offset: float = 0.0) -> None:
+
         temp_dict = {
             'has_neighbor': has_neighbor,
             'neighbor': neighbor,
             'offset': offset,
             'perp_offset': perp_offset
         }
-        
+
         if neighbor_group == 'local':
             self.local_neighbors[neighbor_name] = temp_dict
         elif neighbor_group == 'global':
             self.global_neighbors[neighbor_name] = temp_dict
-        
+
     # def set_right_neighbor(self, neighbor = None, offset = 0.0, has_neighbor = True, neighbor_group = 'local', perp_offset = 0.0):
     #     self.set_neighbor(neighbor, 'right', offset, has_neighbor, neighbor_group, perp_offset)
 
@@ -315,26 +310,23 @@ class Switch(Cell):
     def has_neighbor(self, neighbor_name: str = '', neighbor_group: str = 'local') -> bool:
         if neighbor_group == 'local':
             return self.local_neighbors[neighbor_name]['has_neighbor']
-        else:
-            return self.global_neighbors[neighbor_name]['has_neighbor']
+        return self.global_neighbors[neighbor_name]['has_neighbor']
 
     def get_neighbor_offset(self, neighbor_name: str = '', neighbor_group: str = 'local') -> float:
         if neighbor_group == 'local':
             return self.local_neighbors[neighbor_name]['offset']
-        else:
-            return self.global_neighbors[neighbor_name]['offset']
+        return self.global_neighbors[neighbor_name]['offset']
 
     def get_neighbor_perp_offset(self, neighbor_name: str = '', neighbor_group: str = 'local') -> float:
         if neighbor_group == 'local':
             return self.local_neighbors[neighbor_name]['perp_offset']
-        else:
-            return self.global_neighbors[neighbor_name]['perp_offset']
+        return self.global_neighbors[neighbor_name]['perp_offset']
 
     def get_neighbor_direction_list(self) -> list[str]:
 
         name_list = []
 
-        for neighbor_name in self.local_neighbors.keys():
+        for neighbor_name in self.local_neighbors:
             if isinstance(self.local_neighbors[neighbor_name], dict):
                 name_list.append(neighbor_name)
 

@@ -1,11 +1,10 @@
 
 
 import logging
-import sys
 
 # from cell import Cell
 
-class SwitchConfig():
+class SwitchConfig:
 
     SQUARE_SIZE = 14
     SQUARE_SIZE_HALF = SQUARE_SIZE / 2
@@ -45,7 +44,7 @@ class SwitchConfig():
         self.custom_shape_points = custom_shape_points
         self.custom_shape_path = custom_shape_path
 
-        if self.custom_shape == True:
+        if self.custom_shape:
             self.switch_type = 'custom'
 
         self.logger.info('self.custom_shape: %s, self.custom_shape_points: %s, self.custom_shape_path: %s', str(self.custom_shape), str(self.custom_shape_points), str(self.custom_shape_path))
@@ -85,28 +84,26 @@ class SwitchConfig():
         self.cherry_support_cutout_h = 3.5
         self.cherry_stab_bar_width = 2.5
 
-    
+
     def get_switch_poly_info(self) -> list | None:
-        
+
         self.logger.info(self.switch_type)
-        if self.switch_type in self.switch_type_function_dict.keys():
+        if self.switch_type in self.switch_type_function_dict:
             return self.switch_type_function_dict[self.switch_type]()
-        else:
-            raise ValueError('switch type %s is not a valid switch type' % (self.switch_type))
+        raise ValueError(f'switch type {self.switch_type} is not a valid switch type')
 
 
 
     def get_stab_poly_info(self, key_width: float = 1.0) -> tuple:
-        if self.stabilizer_type in self.stab_type_function_dict.keys():
+        if self.stabilizer_type in self.stab_type_function_dict:
             return self.stab_type_function_dict[self.stabilizer_type](key_width)
-        else:
-            raise ValueError('stabilizer type %s is not a valid stabilizer type' % (self.stabilizer_type))
-        
+        raise ValueError(f'stabilizer type {self.stabilizer_type} is not a valid stabilizer type')
 
-    
+
+
 
     def mx_openable_switch_cutout(self) -> list:
-        poly_points = [
+        return [
             [self.SQUARE_SIZE_HALF + self.kerf, -self.SQUARE_SIZE_HALF -  self.kerf], # 0
             [self.SQUARE_SIZE_HALF + self.kerf, -self.CLIP_NOTCH_Y_MAX -  self.kerf], # 1
             [self.CLIP_NOTCH_X + self.kerf, -self.CLIP_NOTCH_Y_MAX -  self.kerf], # 2
@@ -134,7 +131,6 @@ class SwitchConfig():
         # y_top = self.kerf + self.SQUARE_SIZE_HALF - self.CORNER_CIRCLE_EDGE_OFFSET
         # y_bottom = self.kerf - self.SQUARE_SIZE_HALF + self.CORNER_CIRCLE_EDGE_OFFSET
 
-        return poly_points
 
         # d = polygon(poly_points, poly_path)
         # d += right(x_right) ( forward(y_top) ( circle(r = .4) ) )
@@ -145,51 +141,48 @@ class SwitchConfig():
 
 
     def mx_switch_cutout(self) -> list:
-        poly_points = [
+        return [
             [7 + self.kerf, -7 -  self.kerf], # 0
             [7 + self.kerf, 7 + self.kerf], # 1
-			[-7 -  self.kerf, 7 + self.kerf], # 2
+            [-7 -  self.kerf, 7 + self.kerf], # 2
             [-7 -  self.kerf, -7 -  self.kerf] # 3
-            
+
         ]
 
-        return poly_points
 
 
 
     def mx_alps_switch_cutout(self) -> list:
-        poly_points = [
+        return [
             [7 + self.kerf, -7 -  self.kerf], # 0
             [7 + self.kerf, -6.4 -  self.kerf], # 1
             [7.8 + self.kerf, -6.4 -  self.kerf], # 2
             [7.8 + self.kerf, 6.4 + self.kerf], # 3
-			[7 + self.kerf, 6.4 + self.kerf], # 4
+            [7 + self.kerf, 6.4 + self.kerf], # 4
             [7 + self.kerf, 7 + self.kerf], # 5
             [-7 -  self.kerf, 7 + self.kerf], # 6
             [-7 -  self.kerf, 6.4 + self.kerf], # 7
-			[-7.8 -  self.kerf, 6.4 + self.kerf], # 8
+            [-7.8 -  self.kerf, 6.4 + self.kerf], # 8
             [-7.8 -  self.kerf, -6.4 -  self.kerf], # 9
             [-7 -  self.kerf, -6.4 -  self.kerf], # 10
             [-7 -  self.kerf, -7 -  self.kerf] # 11
         ]
 
-        return poly_points
 
-    
+
     def alps_switch_cutout(self) -> list:
-        poly_points = [
+        return [
             [7.8 + self.kerf, -6.4 -  self.kerf], # 0
             [7.8 + self.kerf, 6.4 + self.kerf], # 1
-			[-7.8 -  self.kerf, 6.4 + self.kerf], # 2
+            [-7.8 -  self.kerf, 6.4 + self.kerf], # 2
             [-7.8 -  self.kerf, -6.4 -  self.kerf] # 3
         ]
 
-        return poly_points
 
 
 
     def custom_switch_cutout(self) -> list | None:
-        
+
         poly_points = self.custom_shape_points
 
         self.logger.info('custom_switch_cutout: %s', str(poly_points))
@@ -201,55 +194,45 @@ class SwitchConfig():
 
 
     def get_cherry_stab_cutout_spacing(self, key_width: float = 1.0) -> float:
-        
+
         if key_width >= 2.0 and key_width < 3.0: # 2u, 2.25u, 2.5u, 2.75u
             return 11.9
-        elif key_width == 3: # 3u
+        if key_width == 3: # 3u
             return 19.05
-        elif key_width == 4: # 4u
+        if key_width == 4: # 4u
             return 28.575
-        elif key_width == 4.5: # 4.5u
+        if key_width == 4.5: # 4.5u
             return 34.671
-        elif key_width == 5.5: # 5.5u
+        if key_width == 5.5: # 5.5u
             return 42.8625
-        elif key_width == 6: # 6u
+        if key_width == 6: # 6u
             return 47.5
-        elif key_width == 6.25: # 6.25u
+        if key_width == 6.25: # 6.25u
             return 50
-        elif key_width == 6.5: # 6.5u
+        if key_width == 6.5: # 6.5u
             return 52.38
-        elif key_width == 7: # 7u
+        if key_width == 7: # 7u
             return 57.15
-        elif key_width == 8: # 8u
+        if key_width in {8, 9, 10}: # 8u
             return 66.675
-        elif key_width == 9: # 9u
-            return 66.675
-        elif key_width == 10: # 10u
-            return 66.675
-        else:
-            return -1
+        return -1
 
 
     def get_alps_stab_cutout_spacing(self, key_width: float = 1.0) -> float:
 
         if key_width == 1.75:
             return 11.938
-        elif key_width == 2.0:
+        if key_width in {2.0, 2.25, 2.75}:
             return 14.096
-        elif key_width == 2.25:
-            return 14.096
-        elif key_width == 2.75:
-            return 14.096
-        elif key_width == 6.25:
+        if key_width == 6.25:
             return 41.859
-        elif key_width == 6.5:
+        if key_width == 6.5:
             return 45.3
-        else:
-            return -1
+        return -1
 
 
     def cherry_costar_stab_cutout(self, key_width: float = 1.0) -> tuple:
-        
+
 
         support_cutout_poly_points = None
 
@@ -298,14 +281,13 @@ class SwitchConfig():
 
             return poly_points, support_cutout_poly_points
 
-        else:
-            return None, None
+        return None, None
 
-    
+
 
     def cherry_stab_cutout(self, key_width: float = 1.0) -> tuple:
-        
-        
+
+
         support_cutout_poly_points = None
 
         s = self.get_cherry_stab_cutout_spacing(key_width = key_width)
@@ -342,7 +324,7 @@ class SwitchConfig():
                 [-s + 3.375 + self.kerf, -5.53 -  self.kerf], # 26
                 [-s + 3.375 + self.kerf, -2.3 -  self.kerf], # 27
             ]
-            
+
             support_cutout_x = s - 3.375 -  (self.kerf * 2 )
             support_cutout_y = 7.97 + (self.kerf * 2 )
             support_cutout_w = (s + 4.375 + (self.kerf * 2 )) - (s - 4.375 -  (self.kerf * 2 ))
@@ -362,8 +344,7 @@ class SwitchConfig():
 
             return poly_points, support_cutout_poly_points
 
-        else:
-            return None, None
+        return None, None
 
 
 
@@ -382,12 +363,11 @@ class SwitchConfig():
 
             return poly_points, support_cutout_poly_points
 
-        else:
-            return None, None
+        return None, None
 
 
     def alps_stab_cutout(self, key_width: float = 1.0) -> tuple:
-        
+
 
         support_cutout_poly_points = None
 
@@ -397,7 +377,7 @@ class SwitchConfig():
             poly_points = [
                 [s - 1.333 -  self.kerf, 3.873 -  self.kerf], # 0
                 [s + 1.333 + self.kerf, 3.873 -  self.kerf], # 1
-			    [s + 1.333 + self.kerf, 9.08 + self.kerf], # 2
+                [s + 1.333 + self.kerf, 9.08 + self.kerf], # 2
                 [s - 1.333 -  self.kerf, 9.08 + self.kerf] # 3
             ]
 
@@ -425,8 +405,7 @@ class SwitchConfig():
             self.logger.debug(support_cutout_poly_points)
             return poly_points, support_cutout_poly_points
 
-        else:
-            return None, None
+        return None, None
 
     def custom_stab_cutout(self, key_width: float = 1.0) -> tuple:
         s = self.get_cherry_stab_cutout_spacing(key_width = key_width)
@@ -482,5 +461,4 @@ class SwitchConfig():
 
             return poly_points, support_cutout_poly_points, [("stab_cutout", stab_cutout_poly_points), ("support_infill", test_points)]
 
-        else:
-            return None, None
+        return None, None

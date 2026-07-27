@@ -1,12 +1,11 @@
+import logging
+import math
+from dataclasses import dataclass
+
 from solid import *
 from solid import OpenSCADObject
 from solid.utils import *
 
-import logging
-import math
-import json
-import sys
-from dataclasses import dataclass
 from parameters import Parameters
 
 
@@ -216,7 +215,7 @@ class Cell:
     #     return u_value * Cell.SWITCH_SPACING
 
     def __str__(self) -> str:
-        return '%s (%f, %f)' % (self.cell_value, self.x, self.y)
+        return f'{self.cell_value} ({self.x:f}, {self.y:f})'
 
     def get(self) -> OpenSCADObject:
         return self.solid
@@ -224,70 +223,62 @@ class Cell:
     def get_moved(self) -> OpenSCADObject:
         return up(self.z_offset) ( right(self.x_start_mm) ( forward(self.y_start_mm) ( self.solid ) ) )
 
-    def get_start_x(self) -> float: 
+    def get_start_x(self) -> float:
         if self.rotation == 0.0:
             return self.x
-        else:
-            return self.get_rotated_start_x()
+        return self.get_rotated_start_x()
 
-    
+
     def get_start_y(self) -> float:
         if self.rotation == 0.0:
             return self.y
-        else:
-            return self.get_rotated_start_y()
+        return self.get_rotated_start_y()
 
-    def get_end_x(self) -> float: 
+    def get_end_x(self) -> float:
         if self.rotation == 0.0:
             return self.end_x
-        else:
-            return self.get_rotated_end_x()
+        return self.get_rotated_end_x()
 
-    
+
     def get_end_y(self) -> float:
         if self.rotation == 0.0:
             return self.end_y
-        else:
-            return self.get_rotated_end_y()
+        return self.get_rotated_end_y()
 
     def get_rotated_start_x(self) -> float:
         min_x = 1000.0
         for corner_name in self.CORNER_ORDER:
-            if 'rotated_x' in self.rotation_info[corner_name].keys():
+            if 'rotated_x' in self.rotation_info[corner_name]:
                 rotated_x = float(self.rotation_info[corner_name]['rotated_x'])
-                if rotated_x < min_x:
-                    min_x = rotated_x
+                min_x = min(min_x, rotated_x)
 
         return min_x
 
     def get_rotated_end_x(self) -> float:
         max_x = -1000.0
         for corner_name in self.CORNER_ORDER:
-            if 'rotated_x' in self.rotation_info[corner_name].keys():
+            if 'rotated_x' in self.rotation_info[corner_name]:
                 rotated_x = float(self.rotation_info[corner_name]['rotated_x'])
-                if rotated_x > max_x:
-                    max_x = rotated_x
+                max_x = max(max_x, rotated_x)
 
         return max_x
 
     def get_rotated_start_y(self) -> float:
         max_y = -1000.0
         for corner_name in self.CORNER_ORDER:
-            if 'rotated_y' in self.rotation_info[corner_name].keys():
+            if 'rotated_y' in self.rotation_info[corner_name]:
                 rotated_y = float(self.rotation_info[corner_name]['rotated_y'])
-                if rotated_y > max_y:
-                    max_y = rotated_y
-        
+                max_y = max(max_y, rotated_y)
+
         return max_y
 
     def get_rotated_end_y(self) -> float:
         min_y = 1000.0
         for corner_name in self.CORNER_ORDER:
-            if 'rotated_y' in self.rotation_info[corner_name].keys():
+            if 'rotated_y' in self.rotation_info[corner_name]:
                 rotated_y = float(self.rotation_info[corner_name]['rotated_y'])
-                if rotated_y < min_y:
-                    min_y = rotated_y
-        
+                min_y = min(min_y, rotated_y)
+
         return min_y
 
     def hypotenuse(self, adjacent: float, opposite: float) -> float:
@@ -297,25 +288,20 @@ class Cell:
         try:
             tan = float(opposite) / float(adjacent)
         except ZeroDivisionError:
-            
+
             # angle = 90
-            if self.rotation < 0.0:
-                angle = 90.0
-            else:
-                angle = -90.0
-            
-            return angle
+            return 90.0 if self.rotation < 0.0 else -90.0
+
 
         angle = math.atan( tan )
-        angle = math.degrees(angle)
-        return angle
+        return math.degrees(angle)
 
     def get_opposite(self, angle: float, hypotenuse: float) -> float:
         sin_angle = math.sin(math.radians(angle))
         opposite = sin_angle * hypotenuse
         if self.rotation < 0.0:
             opposite = -(opposite)
-        
+
         return opposite
 
     def get_adjacent(self, angle: float, hypotenuse: float) -> float:
@@ -323,28 +309,28 @@ class Cell:
         adjacent = cos_angle * hypotenuse
         if self.rotation < 0.0:
             adjacent = -(adjacent)
-        
+
         return adjacent
 
 
     def get_rotation_info_points(self) -> list[list[float]]:
         points_orig = []
         points = []
-        
+
         for corner_name in self.CORNER_ORDER:
             # self.logger.debug(corner_name)
             points_orig.append([self.rotation_info[corner_name]['rotated_x'], self.rotation_info[corner_name]['rotated_y']])
             points.append([self.parameters.U(self.rotation_info[corner_name]['rotated_x']), self.parameters.U(self.rotation_info[corner_name]['rotated_y'])])
-            
+
         return points
-    
-    
+
+
     def build_rotation_info(self) -> None:
 
         # if self.cell_value in ('CC', 'DD', 'HH', 'II', 'JJ', 'LL'):
         #     self.logger.debug('Build Rotation Info for key %s', str(self))
 
-        for corner_name in self.rotation_info.keys():
+        for corner_name in self.rotation_info:
             adjacent = 0.0
             opposite = 0.0
             if corner_name == 'top_left':

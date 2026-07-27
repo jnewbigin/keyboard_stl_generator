@@ -1,39 +1,37 @@
 
 
-import math
+import itertools
 import logging
-import sys
-
-from typing import Any, Iterator
+import math
+from collections.abc import Iterator
+from typing import Any
 
 from solid import *
 from solid import OpenSCADObject
 from solid.utils import *
 
-from switch import Switch
+from body import Body
+from cable import Cable
+from cell import CellProperties
+from item_collection import ItemCollection
+from parameters import Parameters
+from pcb import PCB
+from rotation_collection import RotationCollection
+from shape_cutout import ShapeCutout
 from support import Support
 from support_cutout import SupportCutout
-from cell import Cell, CellProperties
 from support_properties import SupportProperties
-from item_collection import ItemCollection
-from rotation_collection import RotationCollection
-from body import Body
-from pcb import PCB
-from switch_config import SwitchConfig
-from parameters import Parameters
-from cable import Cable
-from shape_cutout import ShapeCutout
+from switch import Switch
 
 
-
-class Keyboard():
+class Keyboard:
 
     def __init__(self, parameters: Parameters = Parameters()) -> None:
 
         self.parameters = parameters
 
         self.logger = logging.getLogger().getChild(__name__)
-        
+
         self.modifier_include_list = ['x', 'y', 'w', 'h', 'r', 'rx', 'ry', 'd', 'p']
 
         self.kerf = self.parameters.kerf
@@ -101,17 +99,17 @@ class Keyboard():
             w = 1.0
             h = 1.0
 
-            if type(row) == type([]):
+            if isinstance(row, list):
                 # A flag to be used to ignore non key data from the layout file
                 ignore_next = False
                 col: Any
                 for col in row:
-                    if type(col) == type({}):
+                    if isinstance(col, dict):
 
                         key: Any
-                        for key in col.keys():
+                        for key in col:
                             modifier_type = key
-                            
+
                             if modifier_type in self.modifier_include_list:
                                 if modifier_type == 'p':
                                     # KLE profile field, repurposed as a per-switch
@@ -143,13 +141,13 @@ class Keyboard():
                                 if modifier_type == 'd':
                                     # self.logger.debug('Ignore next Item')
                                     ignore_next = True
-                        
-                    elif ignore_next == False:
+
+                    elif not ignore_next:
                         col_escaped = col.encode("unicode_escape").decode("utf-8")
                         # split on newline character and get the lat element in the resulting list
                         col_escaped = col_escaped.split('\\n')[-1]
                         # self.logger.debug('column value: %s', col_escaped)
-                        
+
                         x_offset = x
                         y_offset = -(y)
 
@@ -162,22 +160,22 @@ class Keyboard():
 
                         # Create switch cutout and support object without rotation
                         if rotation == 0.0:
-                            self.switch_collection.add_item(x_offset, y_offset, switch)    
+                            self.switch_collection.add_item(x_offset, y_offset, switch)
                             self.support_collection.add_item(x_offset, y_offset, support)
                             self.support_cutout_collection.add_item(x_offset, y_offset, support_cutout)
-                            
-                            
+
+
                         # Create switch cutout and support object without rotation
                         elif rotation != 0.0:
                             self.switch_rotation_collection.add_item(rotation, x_offset, y_offset, switch, rx, ry)
                             self.support_rotation_collection.add_item(rotation, x_offset, y_offset, support, rx, ry)
                             self.support_cutout_rotation_collection.add_item(rotation, x_offset, y_offset, support_cutout, rx, ry)
 
-                        x += w    
+                        x += w
                         w = 1.0
                         h = 1.0
 
-                    elif ignore_next == True:
+                    elif ignore_next:
                         ignore_next = False
 
                 y += 1
@@ -188,7 +186,7 @@ class Keyboard():
         self.split_keyboard()
 
     def process_custom_shapes(self) -> None:
-        
+
 
         if self.parameters.custom_polygons is not None:
             for shape in self.parameters.custom_polygons:
@@ -204,8 +202,8 @@ class Keyboard():
 
 
     def get_assembly(self, top: bool = False, bottom: bool = False, all: bool = True, plate_only: bool = False, case_bottom: bool = False) -> OpenSCADObject:
-        
-        
+
+
         # Init top_assembly and bottom_assembly objects
         top_assembly = union()
         bottom_assembly = union()
@@ -232,19 +230,15 @@ class Keyboard():
 
         (rotated_min_x, rotated_max_x, rotated_max_y, rotated_min_y) = self.switch_rotation_collection.get_real_collection_bounds()
 
-        self.logger.debug('rotation_bounds: rotated_min_x: %f, rotated_max_x: %f, rotated_max_y: %f, rotated_min_y: %f', 
+        self.logger.debug('rotation_bounds: rotated_min_x: %f, rotated_max_x: %f, rotated_max_y: %f, rotated_min_y: %f',
             rotated_min_x, rotated_max_x, rotated_max_y, rotated_min_y)
 
-        if rotated_min_x < min_x:
-            min_x = rotated_min_x
-        if rotated_max_x > max_x:
-            max_x = rotated_max_x
-        if rotated_min_y < min_y:
-            min_y = rotated_min_y
-        if rotated_max_y > max_y:
-            max_y = rotated_max_y
+        min_x = min(min_x, rotated_min_x)
+        max_x = max(max_x, rotated_max_x)
+        min_y = min(min_y, rotated_min_y)
+        max_y = max(max_y, rotated_max_y)
 
-        # Union together all rotated switch cutouts 
+        # Union together all rotated switch cutouts
         for rotation in self.switch_rotation_collection.get_rotation_list():
             self.switch_cutouts += self.switch_rotation_collection.get_rotated_moved_union(rotation)
             self.switch_supports += self.support_rotation_collection.get_rotated_moved_union(rotation)
@@ -265,14 +259,14 @@ class Keyboard():
         assert self.body is not None
         top_assembly += self.body.case(plate_only = plate_only, walls_only = case_bottom)
 
-        if self.parameters.simple_test == False and case_bottom == False:
+        if not self.parameters.simple_test and not case_bottom:
             # Remove switch suport cutouts
             top_assembly -= self.switch_support_cutouts
 
             # Add switch supports and remove switch cutouts
             top_assembly += self.switch_supports
             top_assembly -= self.switch_cutouts
-        
+
         # Generate screw hole related objects
         screw_hole_collection = None
         screw_hole_body_collection = None
@@ -289,14 +283,14 @@ class Keyboard():
 
         assert self.body is not None
         body_block = self.body.case(body_block_only = True)
-        
+
         # Remove items marked as not part of desired section
         if self.desired_section_number > -1:
             top_assembly -= self.get_top_section_remove_block(self.desired_section_number)
             # TODO
             bottom_section_inclusion = self.get_bottom_section_remove_block(self.desired_section_number)
             # bottom_assembly -= self.get_bottom_section_remove_block(self.desired_section_number)
-        
+
 
         assert self.parameters.case_height_base_removed is not None
         self.custom_polygon_cutout_collection = up(self.parameters.case_height_base_removed - (self.parameters.plate_thickness / 2)) (
@@ -306,14 +300,14 @@ class Keyboard():
         top_assembly = up(self.parameters.case_height_base_removed - (self.parameters.plate_thickness / 2)) (
             forward(self.parameters.real_max_y + self.parameters.bottom_margin) (
                 right(self.parameters.left_margin) (
-                    top_assembly 
+                    top_assembly
                 )
             )
         )
 
         top_assembly += up(self.parameters.case_height_base_removed) ( #) - (self.parameters.plate_thickness / 2)) (
             right(0) (
-                pcb_model 
+                pcb_model
             )
         )
 
@@ -324,7 +318,7 @@ class Keyboard():
                 )
             )
         )
-        
+
         if screw_hole_collection is not None:
             assert screw_hole_body_collection is not None
             assert screw_hole_body_scaled_collection is not None
@@ -349,7 +343,7 @@ class Keyboard():
                     )
                 )
             )
-        
+
         body_block = up(self.parameters.case_height_base_removed - (self.parameters.plate_thickness / 2)) (
             forward(self.parameters.real_max_y + self.parameters.bottom_margin) (
                 right(self.parameters.left_margin) (
@@ -382,7 +376,7 @@ class Keyboard():
         top_assembly -= self.cable.get_cable_hole()
 
         # Interesect objects with a test block to handle testing specific parts of a model
-        if self.parameters.test_block == True:
+        if self.parameters.test_block:
             test_block_x = self.parameters.test_block_x_end - self.parameters.test_block_x_start
             test_block_y = self.parameters.test_block_y_end - self.parameters.test_block_y_start
             test_block_z = self.parameters.test_block_z_end - self.parameters.test_block_z_start
@@ -391,8 +385,8 @@ class Keyboard():
 
             test_block = translate(
                 [
-                    self.parameters.test_block_x_start, 
-                    self.parameters.test_block_y_start, 
+                    self.parameters.test_block_x_start,
+                    self.parameters.test_block_y_start,
                     self.parameters.test_block_z_start
                 ]
             ) (
@@ -427,7 +421,7 @@ class Keyboard():
         # Remove bottom block to make bottom of case flat. For a fused walls+bottom
         # shell the walls must reach down to the bottom cover so the two overlap and
         # join into a single solid instead of merely touching at z = 0.
-        if case_bottom == True:
+        if case_bottom:
             top_assembly -= down(self.parameters.bottom_cover_thickness) ( bottom_diff_plate )
         else:
             top_assembly -= bottom_diff_plate
@@ -465,36 +459,34 @@ class Keyboard():
         # # top_assembly -= self.switch_rotation_collection.get_rotated_moved_union(rotation)
 
         # top_assembly = self.switch_rotation_collection.draw_rotated_items(rotation)
-        
+
         # return top_assembly
         # ############
 
 
-        if top == True or plate_only == True:
+        if top or plate_only:
             if screw_hole_body_scaled_collection is not None:
                 return (top_assembly - screw_hole_body_scaled_collection)
-            else:
-                return top_assembly
-        elif bottom == True:
+            return top_assembly
+        if bottom:
             return bottom_assembly
-        elif case_bottom == True:
+        if case_bottom:
             # Case walls fused with the bottom cover, no plate (tray-mount shell)
             top_assembly += bottom_assembly
             return top_assembly
-        else:
-            top_assembly += bottom_assembly
-            return top_assembly
-        
-    
+        top_assembly += bottom_assembly
+        return top_assembly
+
+
     # def get_cable_hole(self):
 
     #     if self.cable_hole == True:
     #         return up(self.parameters.case_height_base_removed - (self.parameters.cable_hole_height / 2) - self.parameters.plate_thickness - self.cable_hole_down_offset ) (
-    #             right(self.parameters.left_margin + (self.parameters.real_max_x / 2)) ( 
-    #                 forward(self.parameters.bottom_margin + self.parameters.top_margin + self.parameters.real_max_y) ( 
-    #                     cube([self.parameters.cable_hole_width, self.parameters.case_wall_thickness * 2, self.parameters.cable_hole_height], center = True) 
-    #                 ) 
-    #             ) 
+    #             right(self.parameters.left_margin + (self.parameters.real_max_x / 2)) (
+    #                 forward(self.parameters.bottom_margin + self.parameters.top_margin + self.parameters.real_max_y) (
+    #                     cube([self.parameters.cable_hole_width, self.parameters.case_wall_thickness * 2, self.parameters.cable_hole_height], center = True)
+    #                 )
+    #             )
     #         )
     #     else:
     #         return union()
@@ -676,11 +668,11 @@ class Keyboard():
         # Report the true section widths (these include the seam's finger/weave
         # around keys), so an over-plate section is flagged honestly.
         widths = [w for (w, _h) in self.get_top_section_dimensions()]
-        lines = ['Split recommendation (rotated layout, plate %.0f mm):' % plate]
+        lines = [f'Split recommendation (rotated layout, plate {plate:.0f} mm):']
         if not fits:
             lines.append('  WARNING: a rotated cluster is wider than the plate - it cannot be split to fit.')
         lines.append('  %d section(s); cut at x = %s mm'
-                     % (len(cuts) + 1, ', '.join('%.1f' % c for c in cuts) if cuts else '(none)'))
+                     % (len(cuts) + 1, ', '.join(f'{c:.1f}' for c in cuts) if cuts else '(none)'))
         for i, w in enumerate(widths):
             flag = '' if w <= plate + 1e-6 else '  (exceeds plate - needs finer/angled splitting)'
             lines.append('    section %d width %.1f mm%s' % (i, w, flag))
@@ -795,7 +787,7 @@ class Keyboard():
         bottom_margin_cells = (self.parameters.bottom_margin / self.parameters.switch_spacing) + 1
         sweep_lo = b_min_y - bottom_margin_cells
         sweep_hi = b_max_y + top_margin_cells
-        edges = set([sweep_lo, sweep_hi])
+        edges = {sweep_lo, sweep_hi}
         for item in self._iter_collection_items(self.switch_collection):
             for edge in (item.y - item.h, item.y):
                 if sweep_lo - 1e-9 < edge < sweep_hi + 1e-9:
@@ -899,7 +891,7 @@ class Keyboard():
 
         edges = self._board_y_band_edges()
 
-        for lo, hi in zip(edges, edges[1:]):
+        for lo, hi in itertools.pairwise(edges):
             if hi - lo < 1e-9:
                 continue
             mid = (lo + hi) / 2.0
@@ -916,10 +908,10 @@ class Keyboard():
 
         return clip
 
-    
+
     def get_bottom_section_remove_block(self, section_number: int) -> OpenSCADObject:
-        
-        
+
+
         # section = self.switch_section_list[section_number]
 
         self.logger.debug('Get Section %d', section_number)
@@ -967,7 +959,7 @@ class Keyboard():
     def get_screw_support_interference_offset(self, start_x: float, end_x: float) -> tuple[float, float]:
 
         assert self.body is not None
-        for coord_string in self.body.screw_hole_info.keys():
+        for coord_string in self.body.screw_hole_info:
             screw_hole_info = self.body.screw_hole_info[coord_string]
 
             screw_x = screw_hole_info['x']
@@ -1009,7 +1001,7 @@ class Keyboard():
 
 
 
-    
+
     def set_section(self, section_number: int) -> None:
         self.desired_section_number = section_number
 
@@ -1034,7 +1026,7 @@ class Keyboard():
         for i in range(section_count):
             lefts = []
             rights = []
-            for lo, hi in zip(edges, edges[1:]):
+            for lo, hi in itertools.pairwise(edges):
                 if hi - lo < 1e-9:
                     continue
                 mid = (lo + hi) / 2.0

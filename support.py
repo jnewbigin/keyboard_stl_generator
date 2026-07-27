@@ -1,12 +1,13 @@
+import logging
+
 from solid import *
 from solid import OpenSCADObject
 from solid.utils import *
 
-import logging
-
 from cell import Cell, CellProperties
 from parameters import Parameters
 from support_properties import SupportProperties
+
 
 class Support(Cell):
 
@@ -59,7 +60,7 @@ class Support(Cell):
 
         d += self.switch_support_fillet()
 
-        if self.set_to_origin == True:
+        if self.set_to_origin:
             d = right(self.w_mm / 2) ( back(self.h_mm / 2) ( d ) )
 
         return d
@@ -93,14 +94,14 @@ class Support(Cell):
         )
 
         return band - opening
-        
+
     def switch_support(self) -> OpenSCADObject:
-        
+
         d = cube([self.w_mm, self.h_mm, self.plate_thickness], center = True)
 
-        if self.set_to_origin == True:
+        if self.set_to_origin:
             d = right(self.w_mm / 2) ( back(self.h_mm / 2) ( d ) )
-            
+
         d += self.switch_support_outline()
 
         return d

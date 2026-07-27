@@ -1,13 +1,13 @@
+import logging
+
 from solid import *
 from solid import OpenSCADObject
 from solid.utils import *
 
-import logging
-
 from parameters import Parameters
 
 
-class Cable():
+class Cable:
 
     def __init__(self, parameters: Parameters) -> None:
 
@@ -16,7 +16,7 @@ class Cable():
 
         self.parameters = parameters
 
-        # length and thickness of the pabck pannel that exends beyond the cable hole 
+        # length and thickness of the pabck pannel that exends beyond the cable hole
         # to prevent the holder from falling into the case
         self.stop_plate_thickness = 1
         self.stop_plate_overhang = 3
@@ -33,7 +33,7 @@ class Cable():
         # The spacing between the clips and the suport block
         self.inner_block_clip_offset = 1
         # Width ofthe support block
-        self.inner_block_width = self.parameters.cable_hole_width - (self.inner_block_clip_offset * 2) - (self.clip_arm_thickness * 2) 
+        self.inner_block_width = self.parameters.cable_hole_width - (self.inner_block_clip_offset * 2) - (self.clip_arm_thickness * 2)
 
 
         # Gap to allow between the cable hole size and the clip size
@@ -49,10 +49,10 @@ class Cable():
         self.x_scale = 1.0
         self.y_scale = 1.0
 
-        if self.elipse_horizontal == True:
+        if self.elipse_horizontal:
             self.x_scale = self.x_scale + self.elipse_ratio
             self.y_scale = self.y_scale - self.elipse_ratio
-        if self.elipse_vertical == True:
+        if self.elipse_vertical:
             self.x_scale = self.x_scale - self.elipse_ratio
             self.y_scale = self.y_scale + self.elipse_ratio
 
@@ -79,7 +79,7 @@ class Cable():
         # Calculate the total stop plate width
         cable_hole_plate_width = self.parameters.cable_hole_width + (self.stop_plate_overhang * 2)
         # cable_hole_plate_height = self.parameters.cable_hole_height# + (self.stop_plate_overhang * 2)
-        
+
         # Create stop plate. The stop clock only extends to the sides of the cable holder
         holder = cube([cable_hole_plate_width, self.cable_holder_height, self.stop_plate_thickness], center = True)
 
@@ -94,11 +94,11 @@ class Cable():
         holder += clip_part
 
         # Add block that fills the width of the wall for more support
-        holder += up((self.parameters.case_wall_thickness / 2) + (self.stop_plate_thickness / 2)) ( 
+        holder += up((self.parameters.case_wall_thickness / 2) + (self.stop_plate_thickness / 2)) (
             cube([self.inner_block_width, self.cable_holder_height, self.parameters.case_wall_thickness], center = True)
         )
 
-        # Remvoe the 
+        # Remvoe the
         holder -= self.holder_hole(include_slot = True)
 
         return holder
@@ -106,11 +106,11 @@ class Cable():
 
 
     def holder_hole(self, include_slot: bool = False) -> OpenSCADObject:
-        
+
         # Main cable hole
         hole = cylinder(
-            r = self.parameters.cable_diameter / 2, 
-            h = self.parameters.case_wall_thickness * 4, 
+            r = self.parameters.cable_diameter / 2,
+            h = self.parameters.case_wall_thickness * 4,
             center = True
         )
 
@@ -118,25 +118,25 @@ class Cable():
         hole = scale([self.x_scale, self.y_scale, 1.0]) ( hole )
 
 
-        if include_slot == True:
+        if include_slot:
             # Include a slot above the hole that will accept the cable and clamp
             # Slot object
-            slot = forward(self.parameters.cable_diameter * 2, ) ( 
+            slot = forward(self.parameters.cable_diameter * 2, ) (
                 cube(
                     [
-                        self.parameters.cable_diameter, 
-                        self.parameters.cable_diameter * 4, 
+                        self.parameters.cable_diameter,
+                        self.parameters.cable_diameter * 4,
                         self.parameters.case_wall_thickness * 4
-                    ], 
+                    ],
                     center = True
                 )
             )
 
             # Scale slot to match the x size of the hole elipse
             slot = scale([self.x_scale, 1, 1]) ( slot )
-            
+
             hole += slot
-        
+
         return hole
 
 
@@ -157,14 +157,13 @@ class Cable():
 
         solid = linear_extrude(height = self.cable_holder_height, center = True) (shape)
 
-        solid = rotate(90, [1, 0, 0]) (solid)
-
-        return solid
+        return rotate(90, [1, 0, 0]) (solid)
 
 
-    
+
+
     def holder_main(self) -> OpenSCADObject:
-        
+
         # Get full holder
         holder_main_body = self.holder_full()
 
@@ -183,26 +182,26 @@ class Cable():
         clamp_holder_gap = self.clamp_holder_gap
         clamp_holder_extra = 0.0
 
-        if clamp_remove_block == True:
+        if clamp_remove_block:
             clamp_holder_gap = 0.0
             clamp_holder_extra = self.clamp_holder_gap
-        
+
         # Set the depth of the clapm and include the stop plate tickness and space for the sorrinuding clamp blocks
         clamp_depth = self.parameters.case_wall_thickness + (self.stop_plate_thickness * 3)
 
         # Create clamp block
-        clamp_block = forward((self.cable_holder_height / 2) - (self.clamp_block_height / 2) + (clamp_holder_gap)) ( 
-            cube([self.clamp_block_width + (clamp_holder_extra * 2), self.clamp_block_height - (clamp_holder_gap * 2), clamp_depth], center = True) 
+        clamp_block = forward((self.cable_holder_height / 2) - (self.clamp_block_height / 2) + (clamp_holder_gap)) (
+            cube([self.clamp_block_width + (clamp_holder_extra * 2), self.clamp_block_height - (clamp_holder_gap * 2), clamp_depth], center = True)
         )
 
         # Create strip that will fit into the cable hole slot
-        strip = forward(self.clamp_block_height) ( 
+        strip = forward(self.clamp_block_height) (
             cube(
                 [
-                    self.parameters.cable_diameter - (clamp_holder_gap * 2), 
-                    self.cable_holder_height / 2, 
+                    self.parameters.cable_diameter - (clamp_holder_gap * 2),
+                    self.cable_holder_height / 2,
                     clamp_depth
-                ], 
+                ],
                 center = True
             )
         )
@@ -211,7 +210,7 @@ class Cable():
         clamp_block += scale([self.x_scale, 1, 1]) ( strip )
 
         # Move block up to allign with holder body
-        clamp_block = up((self.parameters.case_wall_thickness / 2)) ( clamp_block )
+        clamp_block = up(self.parameters.case_wall_thickness / 2) ( clamp_block )
 
         # Get the clamp height as a percentage of the whole holder height
         clamp_height = self.cable_holder_height * self.clamp_height_percent_of_holder_height
@@ -220,13 +219,13 @@ class Cable():
         surround_block_height_offset = (self.cable_holder_height - clamp_height) #(clamp_holder_gap * 24)
 
         # Create surround block
-        surround_block = forward((surround_block_height_offset / 2)) ( # forward(self.clamp_block_height - self.clamp_hole_offset) ( 
+        surround_block = forward(surround_block_height_offset / 2) ( # forward(self.clamp_block_height - self.clamp_hole_offset) (
             cube(
                 [
-                    self.clamp_block_width + (clamp_holder_extra * 2), 
+                    self.clamp_block_width + (clamp_holder_extra * 2),
                     clamp_height,
                     self.stop_plate_thickness - (clamp_holder_gap * 2)
-                ], 
+                ],
                 center = True
             )
         )
@@ -250,14 +249,13 @@ class Cable():
 
     def get_cable_hole(self) -> OpenSCADObject:
 
-        if self.parameters.cable_hole == True:
+        if self.parameters.cable_hole:
             assert self.parameters.case_height_base_removed is not None
             return up(self.parameters.case_height_base_removed - (self.parameters.cable_hole_height / 2) - self.parameters.plate_thickness - self.parameters.cable_hole_down_offset ) (
                 right(self.parameters.cable_hole_center_x()) (
-                    forward(self.parameters.bottom_margin + self.parameters.top_margin + self.parameters.real_max_y) ( 
-                        cube([self.parameters.cable_hole_width, self.parameters.case_wall_thickness * 2, self.parameters.cable_hole_height], center = True) 
-                    ) 
-                ) 
+                    forward(self.parameters.bottom_margin + self.parameters.top_margin + self.parameters.real_max_y) (
+                        cube([self.parameters.cable_hole_width, self.parameters.case_wall_thickness * 2, self.parameters.cable_hole_height], center = True)
+                    )
+                )
             )
-        else:
-            return union()
+        return union()

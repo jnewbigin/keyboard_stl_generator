@@ -1,12 +1,13 @@
+import logging
+
 from solid import *
 from solid import OpenSCADObject
 from solid.utils import *
 
-import logging
-
 from cell import Cell, CellProperties
 from parameters import Parameters
 from support_properties import SupportProperties
+
 
 class SupportCutout(Cell):
 
@@ -50,6 +51,5 @@ class SupportCutout(Cell):
         skirt_drop = self.support_bar_height + self.z_offset
         d = down(skirt_drop / 2) ( cube([self.w_mm + eps, self.h_mm + eps, skirt_drop + self.plate_thickness + eps], center = True) )
 
-        d = right(self.w_mm / 2) ( back(self.h_mm / 2) ( d ) )
+        return right(self.w_mm / 2) ( back(self.h_mm / 2) ( d ) )
 
-        return d # right(u(w / 2)) ( back(u(h / 2)) ( d ) )
