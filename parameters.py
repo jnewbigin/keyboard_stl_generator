@@ -25,6 +25,7 @@ class Parameters:
     SCHEMA_PATH = Path(__file__).resolve().parent / 'parameters.schema.json'
 
     _schema: dict | None = None
+    _validator: jsonschema.protocols.Validator | None = None
 
     PARAMETER_FILE_SUFFIXES = ('.json', '.json5')
 
@@ -366,20 +367,42 @@ class Parameters:
             cls._schema = json5.loads(cls.SCHEMA_PATH.read_text(encoding='utf-8'))
         return cls._schema
 
+    @staticmethod
+    def is_finite_number(checker: object, instance: object) -> bool:
+        # JSON5 accepts Infinity and NaN, which JSON does not, so the schema
+        # type on its own lets them through. NaN then spreads silently through
+        # every calculation into the model, and Infinity reaches math.floor.
+        del checker
+        if not jsonschema.Draft202012Validator.TYPE_CHECKER.is_type(instance, 'number'):
+            return False
+        assert isinstance(instance, (int, float))
+        return math.isfinite(instance)
+
+    @classmethod
+    def validator(cls) -> jsonschema.protocols.Validator:
+        if cls._validator is None:
+            type_checker = jsonschema.Draft202012Validator.TYPE_CHECKER.redefine(
+                'number', cls.is_finite_number)
+            validator_class = jsonschema.validators.extend(
+                jsonschema.Draft202012Validator, type_checker=type_checker)
+            cls._validator = validator_class(cls.schema())
+        return cls._validator
+
     @classmethod
     def check_parameter_types(cls, parameter_dict: dict) -> None:
         # Values reach attributes through setattr, so nothing else checks that
         # what a parameter file supplies is the right type. A string "false"
         # would otherwise read as enabled at every truth test.
-        validator = jsonschema.Draft202012Validator(cls.schema())
-
         problems = []
-        for error in sorted(validator.iter_errors(parameter_dict), key=str):
-            if error.absolute_path:
-                name = '.'.join(str(part) for part in error.absolute_path)
-                problems.append(f'{name}: {error.message}')
+        for error in sorted(cls.validator().iter_errors(parameter_dict), key=str):
+            name = '.'.join(str(part) for part in error.absolute_path)
+
+            if isinstance(error.instance, float) and not math.isfinite(error.instance):
+                message = f'{error.instance} is not a finite number'
             else:
-                problems.append(error.message)
+                message = error.message
+
+            problems.append(f'{name}: {message}' if name else message)
 
         if len(problems) > 0:
             raise ValueError('Invalid parameters: {}'.format('; '.join(problems)))

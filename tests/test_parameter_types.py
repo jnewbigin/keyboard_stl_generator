@@ -48,6 +48,42 @@ class TestNumericParameters:
             Parameters({'x_build_size': -5})
 
 
+class TestNonFiniteNumbers:
+    """JSON5 accepts Infinity and NaN where JSON does not.
+
+    Both satisfy the schema type on their own. Infinity used to reach
+    math.floor and raise OverflowError, and NaN used to reach the model and
+    write nan into the generated SCAD without any error at all.
+    """
+
+    def test_infinity_is_rejected(self):
+        with pytest.raises(ValueError, match='x_build_size: inf is not a finite number'):
+            Parameters({'x_build_size': float('inf')})
+
+    def test_negative_infinity_is_rejected(self):
+        with pytest.raises(ValueError, match='is not a finite number'):
+            Parameters({'x_build_size': float('-inf')})
+
+    def test_nan_is_rejected(self):
+        with pytest.raises(ValueError, match='kerf: nan is not a finite number'):
+            Parameters({'kerf': float('nan')})
+
+    def test_nan_nested_in_a_custom_switch_is_rejected(self):
+        points = [[7, 7], [7, float('nan')], [-7, -7], [-7, 7]]
+        with pytest.raises(ValueError, match='is not a finite number'):
+            Parameters({'custom_switch': {'points': points}})
+
+    def test_infinity_from_a_json5_file(self, tmp_path):
+        parameter_file = tmp_path / 'infinite.json5'
+        parameter_file.write_text('{ "x_build_size": Infinity }', encoding='utf-8')
+
+        with pytest.raises(ValueError, match='is not a finite number'):
+            Parameters(Parameters.load_parameter_files([parameter_file]))
+
+    def test_an_ordinary_float_is_still_accepted(self):
+        assert Parameters({'kerf': 0.01}).kerf == 0.01
+
+
 class TestReporting:
     def test_every_bad_parameter_is_reported_at_once(self):
         with pytest.raises(ValueError) as error:
