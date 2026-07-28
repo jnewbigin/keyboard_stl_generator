@@ -51,14 +51,18 @@ class Switch(Cell):
     """
 
     NEIGHBOR_OPOSITE_DICT = {
-        'right': 'left',
-        'left': 'right',
-        'top': 'bottom',
-        'bottom': 'top'
+        "right": "left",
+        "left": "right",
+        "top": "bottom",
+        "bottom": "top",
     }
 
-
-    def __init__(self, props: CellProperties, parameters: Parameters, switch_config: SwitchConfig | None = None) -> None:
+    def __init__(
+        self,
+        props: CellProperties,
+        parameters: Parameters,
+        switch_config: SwitchConfig | None = None,
+    ) -> None:
         super().__init__(props, parameters)
 
         self.logger = logging.getLogger().getChild(__name__)
@@ -69,30 +73,30 @@ class Switch(Cell):
 
         self.solid = self.switch_cutout()
 
-        self.logger.debug('x: %f, y: %f, w: %f, h: %f, end_x: %f, end_y: %f', self.x, self.y, self.w, self.h, self.end_x, self.end_y)
+        self.logger.debug(
+            "x: %f, y: %f, w: %f, h: %f, end_x: %f, end_y: %f",
+            self.x,
+            self.y,
+            self.w,
+            self.h,
+            self.end_x,
+            self.end_y,
+        )
 
         self.global_neighbors: dict[str, Any] = {
-            'right': {
-            },
-            'left': {
-            },
-            'top': {
-            },
-            'bottom': {
-            },
-            'neighbor_check_complete': False
+            "right": {},
+            "left": {},
+            "top": {},
+            "bottom": {},
+            "neighbor_check_complete": False,
         }
 
         self.local_neighbors: dict[str, Any] = {
-            'right': {
-            },
-            'left': {
-            },
-            'top': {
-            },
-            'bottom': {
-            },
-            'neighbor_check_complete': False
+            "right": {},
+            "left": {},
+            "top": {},
+            "bottom": {},
+            "neighbor_check_complete": False,
         }
 
         # self.right = None
@@ -102,43 +106,54 @@ class Switch(Cell):
 
         # self.neighbors
 
-
-    def neighbors_formatted(self, obj: Any, indent: int = 2, current_indent: int = 0) -> str:
-        current_output = ''
-        current_indent_str = ' ' * current_indent
+    def neighbors_formatted(
+        self, obj: Any, indent: int = 2, current_indent: int = 0
+    ) -> str:
+        current_output = ""
+        current_indent_str = " " * current_indent
         if isinstance(obj, dict):
             for i, key in enumerate(obj.keys()):
                 value = obj[key]
-                current_output += current_indent_str + key + ': '
+                current_output += current_indent_str + key + ": "
 
                 if isinstance(value, dict):
-                    current_output += '{\n'
+                    current_output += "{\n"
 
-                current_output += str(self.neighbors_formatted(value, indent, current_indent + indent))
-
+                current_output += str(
+                    self.neighbors_formatted(value, indent, current_indent + indent)
+                )
 
                 if isinstance(value, dict):
-                    current_output += current_indent_str+ '}'
+                    current_output += current_indent_str + "}"
 
                 if i < len(obj.keys()) - 1:
-                    current_output += ','
+                    current_output += ","
 
-                current_output += '\n'
+                current_output += "\n"
 
         else:
             current_output += str(obj)
 
         return current_output
 
-
     def __str__(self) -> str:
-        return 'Switch: ' + super().__str__()
+        return "Switch: " + super().__str__()
 
     def __repr__(self) -> str:
-        global_neighbors_json = self.neighbors_formatted(self.global_neighbors, indent=4, current_indent=10)
-        local_neighbors_json = self.neighbors_formatted(self.local_neighbors, indent=4, current_indent=10)
-        return 'Switch: ' + super().__str__() + '\nglobal neighbors: \n' + global_neighbors_json + '\nlocal neighbors: \n' + local_neighbors_json
-
+        global_neighbors_json = self.neighbors_formatted(
+            self.global_neighbors, indent=4, current_indent=10
+        )
+        local_neighbors_json = self.neighbors_formatted(
+            self.local_neighbors, indent=4, current_indent=10
+        )
+        return (
+            "Switch: "
+            + super().__str__()
+            + "\nglobal neighbors: \n"
+            + global_neighbors_json
+            + "\nlocal neighbors: \n"
+            + local_neighbors_json
+        )
 
     def switch_cutout(self) -> OpenSCADObject:
         """
@@ -151,7 +166,12 @@ class Switch(Cell):
         """
 
         assert self.switch_config is not None
-        self.logger.debug('switch %s, switch type: %s, stab type: %s', self.cell_value, self.switch_config.switch_type, self.switch_config.stabilizer_type)
+        self.logger.debug(
+            "switch %s, switch type: %s, stab type: %s",
+            self.cell_value,
+            self.switch_config.switch_type,
+            self.switch_config.stabilizer_type,
+        )
 
         # switch_poly_points, switch_poly_path = self.switch_config.get_switch_poly_info()
         # stab_poly_points, stab_poly_path = self.switch_config.get_stab_poly_info(key_width = self.switch_length)
@@ -160,13 +180,22 @@ class Switch(Cell):
         assert switch_poly_points is not None
         switch_poly_path = [range(len(switch_poly_points))]
 
-        stab_poly_points, *support_cutout_poly_points = self.switch_config.get_stab_poly_info(key_width = self.switch_length)
+        stab_poly_points, *support_cutout_poly_points = (
+            self.switch_config.get_stab_poly_info(key_width=self.switch_length)
+        )
 
-        advanced_poly_points = support_cutout_poly_points[1] if len(support_cutout_poly_points) == 2 else []
+        advanced_poly_points = (
+            support_cutout_poly_points[1]
+            if len(support_cutout_poly_points) == 2
+            else []
+        )
         support_cutout_poly_points = support_cutout_poly_points[0]
 
-
-        self.logger.debug('\tswitch_poly_points: %d, switch_poly_path: %d', len(switch_poly_points), len(switch_poly_path))
+        self.logger.debug(
+            "\tswitch_poly_points: %d, switch_poly_path: %d",
+            len(switch_poly_points),
+            len(switch_poly_path),
+        )
 
         # Create switch cutout polygon
         cutout_polygon = polygon(switch_poly_points, switch_poly_path)
@@ -175,12 +204,22 @@ class Switch(Cell):
         if stab_poly_points is not None:
             stab_poly_path = [range(len(stab_poly_points))]
 
-            self.logger.debug('\t\tstab_poly_points: %d, stab_poly_path: %d', len(stab_poly_points), len(stab_poly_path))
-            stab = polygon(stab_poly_points, stab_poly_path) + mirror([1, 0, 0]) ( polygon(stab_poly_points, stab_poly_path) )
+            self.logger.debug(
+                "\t\tstab_poly_points: %d, stab_poly_path: %d",
+                len(stab_poly_points),
+                len(stab_poly_path),
+            )
+            stab = polygon(stab_poly_points, stab_poly_path) + mirror([1, 0, 0])(
+                polygon(stab_poly_points, stab_poly_path)
+            )
             # stab = polygon(stab_poly_points, stab_poly_path)# + mirror([1, 0, 0]) ( polygon(stab_poly_points, stab_poly_path) )
             if support_cutout_poly_points is not None:
                 support_cutout_poly_path = [range(len(support_cutout_poly_points))]
-                support_cutout = polygon(support_cutout_poly_points, support_cutout_poly_path) + mirror([1, 0, 0]) ( polygon(support_cutout_poly_points, support_cutout_poly_path) )
+                support_cutout = polygon(
+                    support_cutout_poly_points, support_cutout_poly_path
+                ) + mirror([1, 0, 0])(
+                    polygon(support_cutout_poly_points, support_cutout_poly_path)
+                )
             cutout_polygon += stab
 
         # Through-plate cutouts are a centered column. When a switch is raised
@@ -189,11 +228,11 @@ class Switch(Cell):
         # clears the raised cap and the bottom still punches the base plate.
         extrude_height = 10 + (2 * self.z_offset)
 
-        cutout = linear_extrude(height = extrude_height, center = True)(cutout_polygon)
+        cutout = linear_extrude(height=extrude_height, center=True)(cutout_polygon)
 
         if support_cutout_poly_points is not None:
-            cutout += down( (10 / 2) + (self.parameters.plate_thickness / 2) ) (
-                linear_extrude(height = 10, center = True)(support_cutout)
+            cutout += down((10 / 2) + (self.parameters.plate_thickness / 2))(
+                linear_extrude(height=10, center=True)(support_cutout)
             )
 
         # advanced poly points
@@ -206,93 +245,103 @@ class Switch(Cell):
             poly_path = [range(len(switch_poly_points))]
             advanced_polygon = polygon(poly_points, poly_path)
 
-            if action == 'cutout':
-                cutout += linear_extrude(height = extrude_height, center = True)(advanced_polygon)
-            elif action == 'stab_cutout':
-                # stab cutout it mirrored to each side of the switch
-                support_cutout = advanced_polygon + mirror([1, 0, 0]) ( advanced_polygon )
-                cutout += linear_extrude(height = extrude_height, center = True)(support_cutout)
-            elif action == 'support_cutout':
-                # support cutout it mirrored to each side of the switch
-                support_cutout = advanced_polygon + mirror([1, 0, 0]) ( advanced_polygon )
-
-                # and then extrude down to remove supports
-                cutout += down( (10 / 2) + (self.parameters.plate_thickness / 2) ) (
-                    linear_extrude(height = 10, center = True)(support_cutout)
+            if action == "cutout":
+                cutout += linear_extrude(height=extrude_height, center=True)(
+                    advanced_polygon
                 )
-            elif action == 'support_infill':
+            elif action == "stab_cutout":
+                # stab cutout it mirrored to each side of the switch
+                support_cutout = advanced_polygon + mirror([1, 0, 0])(advanced_polygon)
+                cutout += linear_extrude(height=extrude_height, center=True)(
+                    support_cutout
+                )
+            elif action == "support_cutout":
                 # support cutout it mirrored to each side of the switch
-                support_cutout = advanced_polygon + mirror([1, 0, 0]) ( advanced_polygon )
+                support_cutout = advanced_polygon + mirror([1, 0, 0])(advanced_polygon)
 
                 # and then extrude down to remove supports
-                infill = down( (10 / 2) + (self.parameters.plate_thickness / 2) ) (
-                    linear_extrude(height = 10, center = True)(support_cutout)
+                cutout += down((10 / 2) + (self.parameters.plate_thickness / 2))(
+                    linear_extrude(height=10, center=True)(support_cutout)
+                )
+            elif action == "support_infill":
+                # support cutout it mirrored to each side of the switch
+                support_cutout = advanced_polygon + mirror([1, 0, 0])(advanced_polygon)
+
+                # and then extrude down to remove supports
+                infill = down((10 / 2) + (self.parameters.plate_thickness / 2))(
+                    linear_extrude(height=10, center=True)(support_cutout)
                 )
             else:
                 raise ValueError("Unknown action: " + action)
 
-
-        cutout = rotate(a = 180, v = (0, 0, 1)) ( cutout )
+        cutout = rotate(a=180, v=(0, 0, 1))(cutout)
 
         # Rotate a key if it is taller than it is wide
         if self.vertical:
 
-            cutout = rotate(a = -90, v = (0, 0, 1)) ( cutout )
+            cutout = rotate(a=-90, v=(0, 0, 1))(cutout)
 
-        return right(self.w_mm / 2) ( back(self.h_mm / 2) ( cutout ) )
+        return right(self.w_mm / 2)(back(self.h_mm / 2)(cutout))
 
+    def update_all_neighbors_set(self, neighbor_group: str = "local") -> None:
 
-
-
-    def update_all_neighbors_set(self, neighbor_group: str = 'local') -> None:
-
-        if neighbor_group == 'local':
+        if neighbor_group == "local":
             neighbor_dict = self.local_neighbors
-        elif neighbor_group == 'global':
-            neighbor_dict =  self.global_neighbors
-
+        elif neighbor_group == "global":
+            neighbor_dict = self.global_neighbors
 
         all_neighbors_set = True
         for direction in neighbor_dict:
-            if direction != 'neighbor_check_complete' and len(neighbor_dict[direction].keys()) == 0:
+            if (
+                direction != "neighbor_check_complete"
+                and len(neighbor_dict[direction].keys()) == 0
+            ):
                 all_neighbors_set = False
 
-        neighbor_dict['neighbor_check_complete'] = all_neighbors_set
+        neighbor_dict["neighbor_check_complete"] = all_neighbors_set
 
+    def get_all_neighbors_set(self, neighbor_group: str = "local") -> bool:
 
-    def get_all_neighbors_set(self, neighbor_group: str = 'local') -> bool:
-
-        if neighbor_group == 'local':
+        if neighbor_group == "local":
             neighbor_dict = self.local_neighbors
-        elif neighbor_group == 'global':
-            neighbor_dict =  self.global_neighbors
+        elif neighbor_group == "global":
+            neighbor_dict = self.global_neighbors
 
-        return neighbor_dict['neighbor_check_complete']
+        return neighbor_dict["neighbor_check_complete"]
 
-
-    def get_neighbor(self, neighbor_name: str, neighbor_group: str = 'local') -> Switch | None:
+    def get_neighbor(
+        self, neighbor_name: str, neighbor_group: str = "local"
+    ) -> Switch | None:
 
         neighbor = None
 
-        if neighbor_group == 'local':
-            neighbor = self.local_neighbors[neighbor_name]['neighbor']
-        elif neighbor_group == 'global':
-            neighbor =  self.global_neighbors[neighbor_name]['neighbor']
+        if neighbor_group == "local":
+            neighbor = self.local_neighbors[neighbor_name]["neighbor"]
+        elif neighbor_group == "global":
+            neighbor = self.global_neighbors[neighbor_name]["neighbor"]
 
         return neighbor
 
-    def set_neighbor(self, neighbor: Switch | None = None, neighbor_name: str = '', offset: float = 0.0, has_neighbor: bool = True, neighbor_group: str = 'local', perp_offset: float = 0.0) -> None:
+    def set_neighbor(
+        self,
+        neighbor: Switch | None = None,
+        neighbor_name: str = "",
+        offset: float = 0.0,
+        has_neighbor: bool = True,
+        neighbor_group: str = "local",
+        perp_offset: float = 0.0,
+    ) -> None:
 
         temp_dict = {
-            'has_neighbor': has_neighbor,
-            'neighbor': neighbor,
-            'offset': offset,
-            'perp_offset': perp_offset
+            "has_neighbor": has_neighbor,
+            "neighbor": neighbor,
+            "offset": offset,
+            "perp_offset": perp_offset,
         }
 
-        if neighbor_group == 'local':
+        if neighbor_group == "local":
             self.local_neighbors[neighbor_name] = temp_dict
-        elif neighbor_group == 'global':
+        elif neighbor_group == "global":
             self.global_neighbors[neighbor_name] = temp_dict
 
     # def set_right_neighbor(self, neighbor = None, offset = 0.0, has_neighbor = True, neighbor_group = 'local', perp_offset = 0.0):
@@ -307,20 +356,26 @@ class Switch(Cell):
     # def set_bottom_neighbor(self, neighbor = None, offset = 0.0, has_neighbor = True, neighbor_group = 'local', perp_offset = 0.0):
     #     self.set_neighbor(neighbor, 'bottom', offset, has_neighbor, neighbor_group, perp_offset)
 
-    def has_neighbor(self, neighbor_name: str = '', neighbor_group: str = 'local') -> bool:
-        if neighbor_group == 'local':
-            return self.local_neighbors[neighbor_name]['has_neighbor']
-        return self.global_neighbors[neighbor_name]['has_neighbor']
+    def has_neighbor(
+        self, neighbor_name: str = "", neighbor_group: str = "local"
+    ) -> bool:
+        if neighbor_group == "local":
+            return self.local_neighbors[neighbor_name]["has_neighbor"]
+        return self.global_neighbors[neighbor_name]["has_neighbor"]
 
-    def get_neighbor_offset(self, neighbor_name: str = '', neighbor_group: str = 'local') -> float:
-        if neighbor_group == 'local':
-            return self.local_neighbors[neighbor_name]['offset']
-        return self.global_neighbors[neighbor_name]['offset']
+    def get_neighbor_offset(
+        self, neighbor_name: str = "", neighbor_group: str = "local"
+    ) -> float:
+        if neighbor_group == "local":
+            return self.local_neighbors[neighbor_name]["offset"]
+        return self.global_neighbors[neighbor_name]["offset"]
 
-    def get_neighbor_perp_offset(self, neighbor_name: str = '', neighbor_group: str = 'local') -> float:
-        if neighbor_group == 'local':
-            return self.local_neighbors[neighbor_name]['perp_offset']
-        return self.global_neighbors[neighbor_name]['perp_offset']
+    def get_neighbor_perp_offset(
+        self, neighbor_name: str = "", neighbor_group: str = "local"
+    ) -> float:
+        if neighbor_group == "local":
+            return self.local_neighbors[neighbor_name]["perp_offset"]
+        return self.global_neighbors[neighbor_name]["perp_offset"]
 
     def get_neighbor_direction_list(self) -> list[str]:
 

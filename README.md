@@ -43,11 +43,17 @@ The program can then generate a number of different items. The entire case can b
 ## Development checks
 
 ```
+poetry run black .           # format; --check reports without writing
 poetry run ruff check .      # fast lint; --fix applies the safe fixes
 poetry run pylint *.py tests/*.py
 poetry run mypy
 poetry run pytest
 ```
+
+Black runs on its defaults, so formatting is not something to have an opinion
+about. It wraps at 88 columns while ruff and pylint allow 150, which leaves the
+line length checks to catch only the long strings and comments black cannot
+split.
 
 Ruff settings live in `pyproject.toml` and pylint's in `.pylintrc`. Design
 metrics (argument counts, statement counts and so on) are pylint's job, so the

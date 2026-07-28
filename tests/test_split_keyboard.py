@@ -6,6 +6,7 @@ directly with hand-built column data (fast, no SolidPython). One end-to-end
 characterization test drives the real ``Keyboard`` on a committed layout to
 guard the wiring.
 """
+
 # pylint: disable=protected-access
 import itertools
 import json
@@ -72,8 +73,8 @@ class TestAssignXSections:
         # the board should split into exactly 2 sections, not bump the wide key
         # into a spurious third one (the ai_battleship regression).
         cols = columns(
-            *[(i, [1]) for i in range(10)],   # 0..10u
-            (10.25, [6.25]),                  # wide key: 10.25 -> 16.5u
+            *[(i, [1]) for i in range(10)],  # 0..10u
+            (10.25, [6.25]),  # wide key: 10.25 -> 16.5u
             *[(i, [1]) for i in range(17, 28)],  # 17..28u
         )
         assignments = Keyboard._assign_x_sections(cols, 330, left_margin=10)
@@ -85,10 +86,12 @@ class TestAssignXSections:
         # the structural fix over the old append-in-else loop.
         exactly_one_plate = 5 * SPACING
         cols = [
-            (0.0, [SPACING]),                                   # fits section 0
+            (0.0, [SPACING]),  # fits section 0
             (SPACING, [exactly_one_plate, exactly_one_plate]),  # both == threshold
         ]
-        assignments = Keyboard._assign_x_sections(cols, exactly_one_plate, left_margin=0)
+        assignments = Keyboard._assign_x_sections(
+            cols, exactly_one_plate, left_margin=0
+        )
         # No phantom section, and both boundary keys share one index.
         assert section_count(assignments) == 2
         assert assignments[1] == [1, 1]
@@ -113,8 +116,8 @@ class TestBalancedXSections:
         # plate. Greedy packs section 1 to the brim and leaves a 2u sliver;
         # balancing keeps the same section count but evens the widths out.
         cols = columns(
-            *[(i, [1]) for i in range(10)],       # 0..10u
-            (10.25, [6.25]),                      # wide key: 10.25 -> 16.5u
+            *[(i, [1]) for i in range(10)],  # 0..10u
+            (10.25, [6.25]),  # wide key: 10.25 -> 16.5u
             *[(i + 0.5, [1]) for i in range(16, 27)],  # 16.5..27.5u
         )
         greedy = Keyboard._assign_x_sections(cols, 300, left_margin=5)
@@ -134,15 +137,21 @@ class TestBalancedXSections:
             (10.25, [6.25]),
             *[(i, [1]) for i in range(17, 28)],
         )
-        assert section_count(Keyboard._balanced_x_sections(cols, 330, left_margin=10)) == 2
+        assert (
+            section_count(Keyboard._balanced_x_sections(cols, 330, left_margin=10)) == 2
+        )
 
     def test_single_section_untouched(self):
         cols = columns((0, [1]), (1, [1]), (2, [1]))
-        assert section_count(Keyboard._balanced_x_sections(cols, 330, left_margin=10)) == 1
+        assert (
+            section_count(Keyboard._balanced_x_sections(cols, 330, left_margin=10)) == 1
+        )
 
 
 def build_keyboard(fixture_name, x_build_size):
-    parameters = Parameters({"x_build_size": x_build_size, "y_build_size": x_build_size})
+    parameters = Parameters(
+        {"x_build_size": x_build_size, "y_build_size": x_build_size}
+    )
     keyboard = Keyboard(parameters)
     with open(FIXTURES / fixture_name) as handle:
         keyboard.process_keyboard_layout(json.load(handle))
@@ -199,7 +208,7 @@ class TestPlanSectionCuts:
         cuts, ok = Keyboard.plan_section_cuts(0, 500, 200, [(180, 260)], 5)
         assert ok
         for c in cuts:
-            assert not (180 <= c <= 260), f'cut {c} fell inside the cluster'
+            assert not (180 <= c <= 260), f"cut {c} fell inside the cluster"
 
     def test_cluster_wider_than_plate_is_flagged(self):
         cuts, ok = Keyboard.plan_section_cuts(0, 500, 200, [(50, 300)], 5)
@@ -211,7 +220,7 @@ class TestPlanSectionCuts:
         # small enough to print. Without this the middle section overflows.
         cuts, ok = Keyboard.plan_section_cuts(-4.3, 523.4, 300, [(111, 338)], 5.3)
         assert ok and len(cuts) == 2
-        assert cuts[0] < 111 and cuts[1] > 338          # both cuts clear the cluster
+        assert cuts[0] < 111 and cuts[1] > 338  # both cuts clear the cluster
         edges = [-4.3, *cuts, 523.4]
         widths = [edges[i + 1] - edges[i] for i in range(len(edges) - 1)]
         assert max(widths) <= 300 + 1e-6
@@ -244,13 +253,21 @@ class TestFootprintSplitEndToEnd:
             keyboard = build_keyboard("rotated_cluster.json", x_build_size=plate)
             assert keyboard.planned_boundaries is not None
             spans = keyboard._rotated_cluster_spans()
-            assert spans, 'fixture should have a rotated cluster'
+            assert spans, "fixture should have a rotated cluster"
             for cut in keyboard.planned_boundaries:
                 for lo, hi in spans:
-                    assert not (lo <= cut <= hi), \
-                        'plate %d: cut %.1f slices cluster [%.1f, %.1f]' % (plate, cut, lo, hi)
+                    assert not (
+                        lo <= cut <= hi
+                    ), "plate %d: cut %.1f slices cluster [%.1f, %.1f]" % (
+                        plate,
+                        cut,
+                        lo,
+                        hi,
+                    )
             # top and bottom cover are split into the same number of pieces.
-            assert keyboard.get_bottom_section_count() == keyboard.get_top_section_count()
+            assert (
+                keyboard.get_bottom_section_count() == keyboard.get_top_section_count()
+            )
 
     def test_planned_sections_fit_the_plate(self):
         keyboard = build_keyboard("rotated_cluster.json", x_build_size=200)
@@ -272,8 +289,9 @@ class TestFullBoardCoverage:
         # The rotated cluster really does extend the board past the central keys.
         assert merged_min_y < central_min_y - 1e-6
 
-        bottom_margin_cells = (keyboard.parameters.bottom_margin
-                               / keyboard.parameters.switch_spacing) + 1
+        bottom_margin_cells = (
+            keyboard.parameters.bottom_margin / keyboard.parameters.switch_spacing
+        ) + 1
         lowest_band = min(keyboard._board_y_band_edges())
         # Bands reach the true board bottom, not just the central cluster's.
         assert lowest_band <= merged_min_y - bottom_margin_cells + 1e-9
@@ -296,8 +314,9 @@ class TestSharedSectionSeams:
                         if (item.y - item.h) - 1e-9 <= mid <= item.y + 1e-9:
                             left = U(item.x)
                             right = U(item.x + item.w)
-                            assert not (left + 1e-6 < seam < right - 1e-6), \
-                                f"seam {seam} cuts key [{left}, {right}] on boundary {boundary}"
+                            assert not (
+                                left + 1e-6 < seam < right - 1e-6
+                            ), f"seam {seam} cuts key [{left}, {right}] on boundary {boundary}"
 
     def test_seam_is_shared_so_neighbours_are_complementary(self):
         # Section i's right seam and section i+1's left seam are the same value on

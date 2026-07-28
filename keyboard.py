@@ -1,5 +1,3 @@
-
-
 import itertools
 import logging
 import math
@@ -32,7 +30,7 @@ class Keyboard:
 
         self.logger = logging.getLogger().getChild(__name__)
 
-        self.modifier_include_list = ['x', 'y', 'w', 'h', 'r', 'rx', 'ry', 'd', 'p']
+        self.modifier_include_list = ["x", "y", "w", "h", "r", "rx", "ry", "d", "p"]
 
         self.kerf = self.parameters.kerf
 
@@ -52,8 +50,12 @@ class Keyboard:
 
         self.switch_config = self.parameters.switch_config
 
-        self.build_x = math.floor(parameters.x_build_size / self.parameters.switch_spacing)
-        self.build_y = math.floor(parameters.y_build_size / self.parameters.switch_spacing)
+        self.build_x = math.floor(
+            parameters.x_build_size / self.parameters.switch_spacing
+        )
+        self.build_y = math.floor(
+            parameters.y_build_size / self.parameters.switch_spacing
+        )
 
         self.switch_collection = ItemCollection()
         self.support_collection = ItemCollection()
@@ -85,8 +87,6 @@ class Keyboard:
 
         self.cable = Cable(parameters)
 
-
-
     def process_keyboard_layout(self, keyboard_layout_dict: Any) -> None:
         y = 0.0
         rotation = 0.0
@@ -111,7 +111,7 @@ class Keyboard:
                             modifier_type = key
 
                             if modifier_type in self.modifier_include_list:
-                                if modifier_type == 'p':
+                                if modifier_type == "p":
                                     # KLE profile field, repurposed as a per-switch
                                     # plate z-offset in mm. Sticky like rotation:
                                     # applies until changed (set to 0 to stop).
@@ -122,54 +122,92 @@ class Keyboard:
                                     continue
 
                                 size = float(col[key])
-                                if modifier_type == 'w':
+                                if modifier_type == "w":
                                     w = size
-                                if modifier_type == 'h':
+                                if modifier_type == "h":
                                     h = size
-                                if modifier_type == 'x':
+                                if modifier_type == "x":
                                     x += size
-                                if modifier_type == 'y':
+                                if modifier_type == "y":
                                     y += size
-                                if modifier_type == 'r':
+                                if modifier_type == "r":
                                     rotation = size
                                     y = 0
                                     x = 0
-                                if modifier_type == 'rx':
+                                if modifier_type == "rx":
                                     rx = size
-                                if modifier_type == 'ry':
+                                if modifier_type == "ry":
                                     ry = size
-                                if modifier_type == 'd':
+                                if modifier_type == "d":
                                     # self.logger.debug('Ignore next Item')
                                     ignore_next = True
 
                     elif not ignore_next:
                         col_escaped = col.encode("unicode_escape").decode("utf-8")
                         # split on newline character and get the lat element in the resulting list
-                        col_escaped = col_escaped.split('\\n')[-1]
+                        col_escaped = col_escaped.split("\\n")[-1]
                         # self.logger.debug('column value: %s', col_escaped)
 
                         x_offset = x
                         y_offset = -(y)
 
-                        switch_props = CellProperties(x_offset, y_offset, w, h, rotation = rotation, z_offset = z_offset, cell_value = col_escaped)
-                        support_props = CellProperties(x_offset, y_offset, w, h, rotation = rotation, z_offset = z_offset)
+                        switch_props = CellProperties(
+                            x_offset,
+                            y_offset,
+                            w,
+                            h,
+                            rotation=rotation,
+                            z_offset=z_offset,
+                            cell_value=col_escaped,
+                        )
+                        support_props = CellProperties(
+                            x_offset,
+                            y_offset,
+                            w,
+                            h,
+                            rotation=rotation,
+                            z_offset=z_offset,
+                        )
 
-                        switch = Switch(switch_props, self.parameters, switch_config = self.switch_config)
-                        support = Support(support_props, SupportProperties.from_parameters(self.parameters), self.parameters)
-                        support_cutout = SupportCutout(support_props, SupportProperties.from_parameters(self.parameters, set_to_origin = False), self.parameters)
+                        switch = Switch(
+                            switch_props,
+                            self.parameters,
+                            switch_config=self.switch_config,
+                        )
+                        support = Support(
+                            support_props,
+                            SupportProperties.from_parameters(self.parameters),
+                            self.parameters,
+                        )
+                        support_cutout = SupportCutout(
+                            support_props,
+                            SupportProperties.from_parameters(
+                                self.parameters, set_to_origin=False
+                            ),
+                            self.parameters,
+                        )
 
                         # Create switch cutout and support object without rotation
                         if rotation == 0.0:
                             self.switch_collection.add_item(x_offset, y_offset, switch)
-                            self.support_collection.add_item(x_offset, y_offset, support)
-                            self.support_cutout_collection.add_item(x_offset, y_offset, support_cutout)
-
+                            self.support_collection.add_item(
+                                x_offset, y_offset, support
+                            )
+                            self.support_cutout_collection.add_item(
+                                x_offset, y_offset, support_cutout
+                            )
 
                         # Create switch cutout and support object without rotation
                         elif rotation != 0.0:
-                            self.switch_rotation_collection.add_item(rotation, x_offset, y_offset, switch, rx, ry)
-                            self.support_rotation_collection.add_item(rotation, x_offset, y_offset, support, rx, ry)
-                            self.support_cutout_rotation_collection.add_item(rotation, x_offset, y_offset, support_cutout, rx, ry)
+                            self.switch_rotation_collection.add_item(
+                                rotation, x_offset, y_offset, switch, rx, ry
+                            )
+                            self.support_rotation_collection.add_item(
+                                rotation, x_offset, y_offset, support, rx, ry
+                            )
+                            self.support_cutout_rotation_collection.add_item(
+                                rotation, x_offset, y_offset, support_cutout, rx, ry
+                            )
 
                         x += w
                         w = 1.0
@@ -180,29 +218,35 @@ class Keyboard:
 
                 y += 1
 
-        self.switch_collection.set_collection_neighbors('global')
+        self.switch_collection.set_collection_neighbors("global")
 
         # create sections of the keyboard for usin in splitting for printing
         self.split_keyboard()
 
     def process_custom_shapes(self) -> None:
 
-
         if self.parameters.custom_polygons is not None:
             for shape in self.parameters.custom_polygons:
-                custom_shape_type = shape['type']
-                coordinates_list = shape['coordinates']
+                custom_shape_type = shape["type"]
+                coordinates_list = shape["coordinates"]
 
                 for coordinates in coordinates_list:
                     x = coordinates[0]
                     y = coordinates[1]
 
-                    custom_shape = ShapeCutout(CellProperties(x, y), custom_shape_type, shape, self.parameters)
+                    custom_shape = ShapeCutout(
+                        CellProperties(x, y), custom_shape_type, shape, self.parameters
+                    )
                     self.custom_polygon_collection.add_item(x, y, custom_shape)
 
-
-    def get_assembly(self, top: bool = False, bottom: bool = False, all: bool = True, plate_only: bool = False, case_bottom: bool = False) -> OpenSCADObject:
-
+    def get_assembly(
+        self,
+        top: bool = False,
+        bottom: bool = False,
+        all: bool = True,
+        plate_only: bool = False,
+        case_bottom: bool = False,
+    ) -> OpenSCADObject:
 
         # Init top_assembly and bottom_assembly objects
         top_assembly = union()
@@ -219,19 +263,30 @@ class Keyboard:
         if self.desired_section_number > -1:
             support_collection = self.support_section_list[self.desired_section_number]
             switch_collection = self.switch_section_list[self.desired_section_number]
-            support_cutout_collection = self.support_cutout_section_list[self.desired_section_number]
+            support_cutout_collection = self.support_cutout_section_list[
+                self.desired_section_number
+            ]
 
         self.switch_supports += support_collection.get_moved_union()
         self.switch_cutouts += switch_collection.get_moved_union()
         self.switch_support_cutouts += support_cutout_collection.get_moved_union()
 
         if self.parameters.custom_polygons is not None:
-            self.custom_polygon_cutout_collection = self.custom_polygon_collection.get_moved_union()
+            self.custom_polygon_cutout_collection = (
+                self.custom_polygon_collection.get_moved_union()
+            )
 
-        (rotated_min_x, rotated_max_x, rotated_max_y, rotated_min_y) = self.switch_rotation_collection.get_real_collection_bounds()
+        (rotated_min_x, rotated_max_x, rotated_max_y, rotated_min_y) = (
+            self.switch_rotation_collection.get_real_collection_bounds()
+        )
 
-        self.logger.debug('rotation_bounds: rotated_min_x: %f, rotated_max_x: %f, rotated_max_y: %f, rotated_min_y: %f',
-            rotated_min_x, rotated_max_x, rotated_max_y, rotated_min_y)
+        self.logger.debug(
+            "rotation_bounds: rotated_min_x: %f, rotated_max_x: %f, rotated_max_y: %f, rotated_min_y: %f",
+            rotated_min_x,
+            rotated_max_x,
+            rotated_max_y,
+            rotated_min_y,
+        )
 
         min_x = min(min_x, rotated_min_x)
         max_x = max(max_x, rotated_max_x)
@@ -240,9 +295,17 @@ class Keyboard:
 
         # Union together all rotated switch cutouts
         for rotation in self.switch_rotation_collection.get_rotation_list():
-            self.switch_cutouts += self.switch_rotation_collection.get_rotated_moved_union(rotation)
-            self.switch_supports += self.support_rotation_collection.get_rotated_moved_union(rotation)
-            self.switch_support_cutouts += self.support_cutout_rotation_collection.get_rotated_moved_union(rotation)
+            self.switch_cutouts += (
+                self.switch_rotation_collection.get_rotated_moved_union(rotation)
+            )
+            self.switch_supports += (
+                self.support_rotation_collection.get_rotated_moved_union(rotation)
+            )
+            self.switch_support_cutouts += (
+                self.support_cutout_rotation_collection.get_rotated_moved_union(
+                    rotation
+                )
+            )
 
         # Set body dimensions
         self.parameters.set_dimensions(max_x, min_y, min_x, max_y)
@@ -257,7 +320,7 @@ class Keyboard:
 
         # Add case to top_assembly
         assert self.body is not None
-        top_assembly += self.body.case(plate_only = plate_only, walls_only = case_bottom)
+        top_assembly += self.body.case(plate_only=plate_only, walls_only=case_bottom)
 
         if not self.parameters.simple_test and not case_bottom:
             # Remove switch suport cutouts
@@ -273,7 +336,11 @@ class Keyboard:
         screw_hole_body_scaled_collection = None
         if self.parameters.screw_count > 0:
             assert self.body is not None
-            screw_hole_collection, screw_hole_body_collection, screw_hole_body_scaled_collection = self.body.screw_hole_objects(tap = bottom or case_bottom)
+            (
+                screw_hole_collection,
+                screw_hole_body_collection,
+                screw_hole_body_scaled_collection,
+            ) = self.body.screw_hole_objects(tap=bottom or case_bottom)
 
             # Remove screw holes from top top_assembly
             top_assembly -= screw_hole_collection
@@ -282,92 +349,119 @@ class Keyboard:
             bottom_assembly -= screw_hole_collection
 
         assert self.body is not None
-        body_block = self.body.case(body_block_only = True)
+        body_block = self.body.case(body_block_only=True)
 
         # Remove items marked as not part of desired section
         if self.desired_section_number > -1:
-            top_assembly -= self.get_top_section_remove_block(self.desired_section_number)
+            top_assembly -= self.get_top_section_remove_block(
+                self.desired_section_number
+            )
             # TODO
-            bottom_section_inclusion = self.get_bottom_section_remove_block(self.desired_section_number)
+            bottom_section_inclusion = self.get_bottom_section_remove_block(
+                self.desired_section_number
+            )
             # bottom_assembly -= self.get_bottom_section_remove_block(self.desired_section_number)
 
-
         assert self.parameters.case_height_base_removed is not None
-        self.custom_polygon_cutout_collection = up(self.parameters.case_height_base_removed - (self.parameters.plate_thickness / 2)) (
-            self.custom_polygon_cutout_collection
-        )
+        self.custom_polygon_cutout_collection = up(
+            self.parameters.case_height_base_removed
+            - (self.parameters.plate_thickness / 2)
+        )(self.custom_polygon_cutout_collection)
         # Move top_assembly so that the bottom left sits at 0, 0, 0
-        top_assembly = up(self.parameters.case_height_base_removed - (self.parameters.plate_thickness / 2)) (
-            forward(self.parameters.real_max_y + self.parameters.bottom_margin) (
-                right(self.parameters.left_margin) (
-                    top_assembly
-                )
+        top_assembly = up(
+            self.parameters.case_height_base_removed
+            - (self.parameters.plate_thickness / 2)
+        )(
+            forward(self.parameters.real_max_y + self.parameters.bottom_margin)(
+                right(self.parameters.left_margin)(top_assembly)
             )
         )
 
-        top_assembly += up(self.parameters.case_height_base_removed) ( #) - (self.parameters.plate_thickness / 2)) (
-            right(0) (
-                pcb_model
-            )
+        top_assembly += up(
+            self.parameters.case_height_base_removed
+        )(  # ) - (self.parameters.plate_thickness / 2)) (
+            right(0)(pcb_model)
         )
 
-        bottom_assembly = up(self.parameters.case_height_base_removed - (self.parameters.plate_thickness / 2)) (
-            forward(self.parameters.real_max_y + self.parameters.bottom_margin) (
-                right(self.parameters.left_margin) (
-                    bottom_assembly
-                )
+        bottom_assembly = up(
+            self.parameters.case_height_base_removed
+            - (self.parameters.plate_thickness / 2)
+        )(
+            forward(self.parameters.real_max_y + self.parameters.bottom_margin)(
+                right(self.parameters.left_margin)(bottom_assembly)
             )
         )
 
         if screw_hole_collection is not None:
             assert screw_hole_body_collection is not None
             assert screw_hole_body_scaled_collection is not None
-            screw_hole_collection = up(self.parameters.case_height_base_removed - (self.parameters.plate_thickness / 2)) (
-                forward(self.parameters.real_max_y + self.parameters.bottom_margin) (
-                    right(self.parameters.left_margin) (
-                        screw_hole_collection
-                    )
+            screw_hole_collection = up(
+                self.parameters.case_height_base_removed
+                - (self.parameters.plate_thickness / 2)
+            )(
+                forward(self.parameters.real_max_y + self.parameters.bottom_margin)(
+                    right(self.parameters.left_margin)(screw_hole_collection)
                 )
             )
-            screw_hole_body_collection = up(self.parameters.case_height_base_removed - (self.parameters.plate_thickness / 2)) (
-                forward(self.parameters.real_max_y + self.parameters.bottom_margin) (
-                    right(self.parameters.left_margin) (
-                        screw_hole_body_collection
-                    )
+            screw_hole_body_collection = up(
+                self.parameters.case_height_base_removed
+                - (self.parameters.plate_thickness / 2)
+            )(
+                forward(self.parameters.real_max_y + self.parameters.bottom_margin)(
+                    right(self.parameters.left_margin)(screw_hole_body_collection)
                 )
             )
-            screw_hole_body_scaled_collection = up(self.parameters.case_height_base_removed - (self.parameters.plate_thickness / 2)) (
-                forward(self.parameters.real_max_y + self.parameters.bottom_margin) (
-                    right(self.parameters.left_margin) (
+            screw_hole_body_scaled_collection = up(
+                self.parameters.case_height_base_removed
+                - (self.parameters.plate_thickness / 2)
+            )(
+                forward(self.parameters.real_max_y + self.parameters.bottom_margin)(
+                    right(self.parameters.left_margin)(
                         screw_hole_body_scaled_collection
                     )
                 )
             )
 
-        body_block = up(self.parameters.case_height_base_removed - (self.parameters.plate_thickness / 2)) (
-            forward(self.parameters.real_max_y + self.parameters.bottom_margin) (
-                right(self.parameters.left_margin) (
-                    body_block
-                )
+        body_block = up(
+            self.parameters.case_height_base_removed
+            - (self.parameters.plate_thickness / 2)
+        )(
+            forward(self.parameters.real_max_y + self.parameters.bottom_margin)(
+                right(self.parameters.left_margin)(body_block)
             )
         )
 
         if self.desired_section_number > -1:
-            bottom_section_inclusion = up(self.parameters.case_height_base_removed - (self.parameters.plate_thickness / 2)) (
-                forward(self.parameters.real_max_y + self.parameters.bottom_margin) (
-                    right(self.parameters.left_margin) (
-                        bottom_section_inclusion
-                    )
+            bottom_section_inclusion = up(
+                self.parameters.case_height_base_removed
+                - (self.parameters.plate_thickness / 2)
+            )(
+                forward(self.parameters.real_max_y + self.parameters.bottom_margin)(
+                    right(self.parameters.left_margin)(bottom_section_inclusion)
                 )
             )
 
         # Create block that will remove material to make case bottom flat
-        bottom_diff_plate_width = (self.parameters.real_max_x + self.parameters.right_margin + self.parameters.left_margin) * 2
-        bottom_diff_plate_height = (self.parameters.real_max_y + self.parameters.top_margin + self.parameters.bottom_margin) * 2
-        bottom_diff_plate = down(self.parameters.case_height_extra * 2) (
-            back(bottom_diff_plate_height / 4) (
-                left(bottom_diff_plate_width / 4) (
-                    cube([ bottom_diff_plate_width, bottom_diff_plate_height, self.parameters.case_height_extra * 2 ])
+        bottom_diff_plate_width = (
+            self.parameters.real_max_x
+            + self.parameters.right_margin
+            + self.parameters.left_margin
+        ) * 2
+        bottom_diff_plate_height = (
+            self.parameters.real_max_y
+            + self.parameters.top_margin
+            + self.parameters.bottom_margin
+        ) * 2
+        bottom_diff_plate = down(self.parameters.case_height_extra * 2)(
+            back(bottom_diff_plate_height / 4)(
+                left(bottom_diff_plate_width / 4)(
+                    cube(
+                        [
+                            bottom_diff_plate_width,
+                            bottom_diff_plate_height,
+                            self.parameters.case_height_extra * 2,
+                        ]
+                    )
                 )
             )
         )
@@ -377,21 +471,30 @@ class Keyboard:
 
         # Interesect objects with a test block to handle testing specific parts of a model
         if self.parameters.test_block:
-            test_block_x = self.parameters.test_block_x_end - self.parameters.test_block_x_start
-            test_block_y = self.parameters.test_block_y_end - self.parameters.test_block_y_start
-            test_block_z = self.parameters.test_block_z_end - self.parameters.test_block_z_start
+            test_block_x = (
+                self.parameters.test_block_x_end - self.parameters.test_block_x_start
+            )
+            test_block_y = (
+                self.parameters.test_block_y_end - self.parameters.test_block_y_start
+            )
+            test_block_z = (
+                self.parameters.test_block_z_end - self.parameters.test_block_z_start
+            )
 
-            self.logger.info('test_block_x: %f, test_block_y: %f, test_block_z: %f', test_block_x, test_block_y, test_block_z)
+            self.logger.info(
+                "test_block_x: %f, test_block_y: %f, test_block_z: %f",
+                test_block_x,
+                test_block_y,
+                test_block_z,
+            )
 
             test_block = translate(
                 [
                     self.parameters.test_block_x_start,
                     self.parameters.test_block_y_start,
-                    self.parameters.test_block_z_start
+                    self.parameters.test_block_z_start,
                 ]
-            ) (
-                cube([test_block_x, test_block_y, test_block_z])
-            )
+            )(cube([test_block_x, test_block_y, test_block_z]))
 
             top_assembly *= test_block
             bottom_assembly *= test_block
@@ -408,26 +511,34 @@ class Keyboard:
 
         # Tile the body if desired
         if self.parameters.tilt > 0.0:
-            top_assembly = rotate(self.parameters.tilt, [1, 0, 0]) ( top_assembly )
-            bottom_assembly = rotate(self.parameters.tilt, [1, 0, 0]) ( bottom_assembly )
+            top_assembly = rotate(self.parameters.tilt, [1, 0, 0])(top_assembly)
+            bottom_assembly = rotate(self.parameters.tilt, [1, 0, 0])(bottom_assembly)
             if screw_hole_collection is not None:
                 assert screw_hole_body_collection is not None
                 assert screw_hole_body_scaled_collection is not None
-                screw_hole_collection = rotate(self.parameters.tilt, [1, 0, 0]) ( screw_hole_collection )
-                screw_hole_body_collection = rotate(self.parameters.tilt, [1, 0, 0]) ( screw_hole_body_collection )
-                screw_hole_body_scaled_collection = rotate(self.parameters.tilt, [1, 0, 0]) ( screw_hole_body_scaled_collection )
-            body_block = rotate(self.parameters.tilt, [1, 0, 0]) ( body_block )
+                screw_hole_collection = rotate(self.parameters.tilt, [1, 0, 0])(
+                    screw_hole_collection
+                )
+                screw_hole_body_collection = rotate(self.parameters.tilt, [1, 0, 0])(
+                    screw_hole_body_collection
+                )
+                screw_hole_body_scaled_collection = rotate(
+                    self.parameters.tilt, [1, 0, 0]
+                )(screw_hole_body_scaled_collection)
+            body_block = rotate(self.parameters.tilt, [1, 0, 0])(body_block)
 
         # Remove bottom block to make bottom of case flat. For a fused walls+bottom
         # shell the walls must reach down to the bottom cover so the two overlap and
         # join into a single solid instead of merely touching at z = 0.
         if case_bottom:
-            top_assembly -= down(self.parameters.bottom_cover_thickness) ( bottom_diff_plate )
+            top_assembly -= down(self.parameters.bottom_cover_thickness)(
+                bottom_diff_plate
+            )
         else:
             top_assembly -= bottom_diff_plate
-        bottom_assembly -= down(self.parameters.bottom_cover_thickness) ( bottom_diff_plate )
-
-
+        bottom_assembly -= down(self.parameters.bottom_cover_thickness)(
+            bottom_diff_plate
+        )
 
         # bottom_assembly += self.body.bottom_cover()
         # bottom_assembly += body_block
@@ -463,10 +574,9 @@ class Keyboard:
         # return top_assembly
         # ############
 
-
         if top or plate_only:
             if screw_hole_body_scaled_collection is not None:
-                return (top_assembly - screw_hole_body_scaled_collection)
+                return top_assembly - screw_hole_body_scaled_collection
             return top_assembly
         if bottom:
             return bottom_assembly
@@ -476,7 +586,6 @@ class Keyboard:
             return top_assembly
         top_assembly += bottom_assembly
         return top_assembly
-
 
     # def get_cable_hole(self):
 
@@ -491,7 +600,6 @@ class Keyboard:
     #     else:
     #         return union()
 
-
     def split_keyboard(self) -> None:
         # Boards with rotated clusters (split/ergo layouts) can't be sectioned by
         # the plain column splitter below - it only sees the non-rotated keys and
@@ -504,27 +612,32 @@ class Keyboard:
             return
 
         (min_x, max_x, max_y, min_y) = self.switch_collection.get_collection_bounds()
-        self.logger.debug('max_x: %d, min_y: %d', max_x, min_y)
-        self.logger.debug('build_x: %d, build_y: %d', self.build_x, self.build_y)
+        self.logger.debug("max_x: %d, min_y: %d", max_x, min_y)
+        self.logger.debug("build_x: %d, build_y: %d", self.build_x, self.build_y)
 
         x_parts = math.ceil(max_x / self.build_x)
         y_parts = math.ceil(abs(min_y) / self.build_y)
-        self.logger.debug('x_parts: %d, y_parts: %d', x_parts, y_parts)
+        self.logger.debug("x_parts: %d, y_parts: %d", x_parts, y_parts)
 
         # Walk the keys column by column (ascending x, matching the seam logic in
         # _assign_x_sections) and describe each column as its left edge in mm plus
         # the right edge of every key in it. The pure seam math decides which
         # section each key belongs to; distributing the actual items is separate.
-        column_keys = [(x, self.switch_collection.get_sorted_y_list_in_x(x))
-                       for x in self.switch_collection.get_sorted_x_list()]
+        column_keys = [
+            (x, self.switch_collection.get_sorted_y_list_in_x(x))
+            for x in self.switch_collection.get_sorted_x_list()
+        ]
         columns = [
-            (self.parameters.U(x),
-             [self.switch_collection.get_item(x, y).x_end_mm for y in ys])
+            (
+                self.parameters.U(x),
+                [self.switch_collection.get_item(x, y).x_end_mm for y in ys],
+            )
             for (x, ys) in column_keys
         ]
 
         assignments = self._balanced_x_sections(
-            columns, self.parameters.x_build_size, self.parameters.left_margin)
+            columns, self.parameters.x_build_size, self.parameters.left_margin
+        )
 
         section_count = max(self._count_sections(assignments), 1)
         while len(self.switch_section_list) < section_count:
@@ -534,9 +647,15 @@ class Keyboard:
 
         for (x, ys), column_sections in zip(column_keys, assignments):
             for y, section in zip(ys, column_sections):
-                self.switch_section_list[section].add_item(x, y, self.switch_collection.get_item(x, y))
-                self.support_section_list[section].add_item(x, y, self.support_collection.get_item(x, y))
-                self.support_cutout_section_list[section].add_item(x, y, self.support_cutout_collection.get_item(x, y))
+                self.switch_section_list[section].add_item(
+                    x, y, self.switch_collection.get_item(x, y)
+                )
+                self.support_section_list[section].add_item(
+                    x, y, self.support_collection.get_item(x, y)
+                )
+                self.support_cutout_section_list[section].add_item(
+                    x, y, self.support_cutout_collection.get_item(x, y)
+                )
 
         for section_collection in self.switch_section_list:
             section_collection.set_collection_neighbors()
@@ -553,7 +672,10 @@ class Keyboard:
         # key cell (not the smaller switch cutout) keeps the span conservative.
         U = self.parameters.U
         spans: list[list[float]] = []
-        for rotation, collection in self.switch_rotation_collection.rotation_collection.items():
+        for (
+            rotation,
+            collection,
+        ) in self.switch_rotation_collection.rotation_collection.items():
             theta = math.radians(-rotation)
             cos_t, sin_t = math.cos(theta), math.sin(theta)
             xs: list[float] = []
@@ -563,8 +685,12 @@ class Keyboard:
                     for x in collection.get_x_list_in_rx_ry(rx, ry):
                         for y in collection.get_y_list_in_rx_ry_x(x, rx, ry):
                             item = collection.get_item(x, y, rx, ry)
-                            corners = ((item.x, item.y), (item.x + item.w, item.y),
-                                       (item.x + item.w, item.y - item.h), (item.x, item.y - item.h))
+                            corners = (
+                                (item.x, item.y),
+                                (item.x + item.w, item.y),
+                                (item.x + item.w, item.y - item.h),
+                                (item.x, item.y - item.h),
+                            )
                             for cell_x, cell_y in corners:
                                 real_x, real_y = U(cell_x), U(cell_y)
                                 xs.append((real_x * cos_t - real_y * sin_t) + x_shift)
@@ -580,8 +706,13 @@ class Keyboard:
         return [(lo, hi) for lo, hi in merged]
 
     @staticmethod
-    def plan_section_cuts(board_left: float, board_right: float, plate: float,
-                          uncuttable_spans: list[tuple[float, float]], safety: float) -> tuple[list[float], bool]:
+    def plan_section_cuts(
+        board_left: float,
+        board_right: float,
+        plate: float,
+        uncuttable_spans: list[tuple[float, float]],
+        safety: float,
+    ) -> tuple[list[float], bool]:
         # Choose the fewest boundary x positions (mm) that cut the board into
         # sections no wider than the plate, with no boundary inside an uncuttable
         # (rotated cluster) span. Greedy: extend each section as far right as the
@@ -604,8 +735,11 @@ class Keyboard:
                     # cluster's section snug so the keys just past it fall in the
                     # next section and the seam needn't bulge past the plate to
                     # clear them.
-                    ends = [hi + safety for lo, hi in spans
-                            if lo >= start - 1e-9 and hi + safety <= limit + 1e-9]
+                    ends = [
+                        hi + safety
+                        for lo, hi in spans
+                        if lo >= start - 1e-9 and hi + safety <= limit + 1e-9
+                    ]
                     if ends:
                         cut = max(ends)
                 # Pull the cut clear of any cluster it lands in. Right-to-left so
@@ -628,7 +762,9 @@ class Keyboard:
             return tight_cuts, tight_ok
         return greedy_cuts, greedy_ok
 
-    def _split_keyboard_by_footprint(self, cluster_spans: list[tuple[float, float]]) -> None:
+    def _split_keyboard_by_footprint(
+        self, cluster_spans: list[tuple[float, float]]
+    ) -> None:
         U = self.parameters.U
         (f_min_x, f_max_x, f_max_y, f_min_y) = self._full_board_bounds()
         board_left = U(f_min_x) - self.parameters.left_margin
@@ -636,7 +772,9 @@ class Keyboard:
         plate = self.parameters.x_build_size
         safety = self.parameters.section_finger_depth + self.kerf + 1.0
 
-        cuts, fits = self.plan_section_cuts(board_left, board_right, plate, cluster_spans, safety)
+        cuts, fits = self.plan_section_cuts(
+            board_left, board_right, plate, cluster_spans, safety
+        )
         self.planned_boundaries = cuts
         section_count = len(cuts) + 1
 
@@ -656,8 +794,12 @@ class Keyboard:
                 centre = (item.x_start_mm + item.x_end_mm) / 2.0
                 section = sum(1 for cut in cuts if centre >= cut)
                 self.switch_section_list[section].add_item(x, y, item)
-                self.support_section_list[section].add_item(x, y, self.support_collection.get_item(x, y))
-                self.support_cutout_section_list[section].add_item(x, y, self.support_cutout_collection.get_item(x, y))
+                self.support_section_list[section].add_item(
+                    x, y, self.support_collection.get_item(x, y)
+                )
+                self.support_cutout_section_list[section].add_item(
+                    x, y, self.support_cutout_collection.get_item(x, y)
+                )
 
         for section_collection in self.switch_section_list:
             section_collection.set_collection_neighbors()
@@ -668,18 +810,28 @@ class Keyboard:
         # Report the true section widths (these include the seam's finger/weave
         # around keys), so an over-plate section is flagged honestly.
         widths = [w for (w, _h) in self.get_top_section_dimensions()]
-        lines = [f'Split recommendation (rotated layout, plate {plate:.0f} mm):']
+        lines = [f"Split recommendation (rotated layout, plate {plate:.0f} mm):"]
         if not fits:
-            lines.append('  WARNING: a rotated cluster is wider than the plate - it cannot be split to fit.')
-        lines.append('  %d section(s); cut at x = %s mm'
-                     % (len(cuts) + 1, ', '.join(f'{c:.1f}' for c in cuts) if cuts else '(none)'))
+            lines.append(
+                "  WARNING: a rotated cluster is wider than the plate - it cannot be split to fit."
+            )
+        lines.append(
+            "  %d section(s); cut at x = %s mm"
+            % (len(cuts) + 1, ", ".join(f"{c:.1f}" for c in cuts) if cuts else "(none)")
+        )
         for i, w in enumerate(widths):
-            flag = '' if w <= plate + 1e-6 else '  (exceeds plate - needs finer/angled splitting)'
-            lines.append('    section %d width %.1f mm%s' % (i, w, flag))
-        return '\n'.join(lines)
+            flag = (
+                ""
+                if w <= plate + 1e-6
+                else "  (exceeds plate - needs finer/angled splitting)"
+            )
+            lines.append("    section %d width %.1f mm%s" % (i, w, flag))
+        return "\n".join(lines)
 
     @staticmethod
-    def _assign_x_sections(columns: list[tuple[float, list[float]]], threshold: float, left_margin: float) -> list[list[int]]:
+    def _assign_x_sections(
+        columns: list[tuple[float, list[float]]], threshold: float, left_margin: float
+    ) -> list[list[int]]:
         # Decide which printable x-section each key belongs to, working purely in
         # millimetres so the logic can be unit tested without a Keyboard.
         #
@@ -723,7 +875,11 @@ class Keyboard:
         return max((s for column in assignments for s in column), default=-1) + 1
 
     @staticmethod
-    def _balanced_x_sections(columns: list[tuple[float, list[float]]], x_build_size: float, left_margin: float) -> list[list[int]]:
+    def _balanced_x_sections(
+        columns: list[tuple[float, list[float]]],
+        x_build_size: float,
+        left_margin: float,
+    ) -> list[list[int]]:
         # Packing greedily up to the full plate width uses the fewest sections but
         # fills each to the brim, leaving a thin remainder (e.g. a 27.75u board on a
         # 300mm plate splits 11.5u / 15.25u / 2u). Section count is monotonic in the
@@ -731,7 +887,8 @@ class Keyboard:
         # threshold that still yields it - which minimises the widest section and
         # spreads the keys as evenly as the plate and un-cuttable wide keys allow.
         target_count = Keyboard._count_sections(
-            Keyboard._assign_x_sections(columns, x_build_size, left_margin))
+            Keyboard._assign_x_sections(columns, x_build_size, left_margin)
+        )
         if target_count <= 1:
             return Keyboard._assign_x_sections(columns, x_build_size, left_margin)
 
@@ -739,7 +896,8 @@ class Keyboard:
         for _ in range(40):
             mid = (low + high) / 2
             count = Keyboard._count_sections(
-                Keyboard._assign_x_sections(columns, mid, left_margin))
+                Keyboard._assign_x_sections(columns, mid, left_margin)
+            )
             if count <= target_count:
                 high = mid
             else:
@@ -752,11 +910,13 @@ class Keyboard:
         return assignments
 
     def get_top_section_remove_block(self, section_number: int) -> OpenSCADObject:
-        self.logger.debug('Get Section %d', section_number)
+        self.logger.debug("Get Section %d", section_number)
         assert self.parameters.case_height_base_removed is not None
         remove_block_height = self.parameters.case_height_base_removed * 4
         remove_block_z_offset = remove_block_height / 2
-        return self.get_section_x_clip(section_number, remove_block_height, remove_block_z_offset)
+        return self.get_section_x_clip(
+            section_number, remove_block_height, remove_block_z_offset
+        )
 
     @staticmethod
     def _iter_collection_items(collection: ItemCollection) -> Iterator[Any]:
@@ -774,17 +934,27 @@ class Keyboard:
         # switch_collection alone underestimates the board and leaves the extra
         # plate uncut.
         (min_x, max_x, max_y, min_y) = self.switch_collection.get_collection_bounds()
-        (r_min_x, r_max_x, r_max_y, r_min_y) = self.switch_rotation_collection.get_real_collection_bounds()
-        return (min(min_x, r_min_x), max(max_x, r_max_x),
-                max(max_y, r_max_y), min(min_y, r_min_y))
+        (r_min_x, r_max_x, r_max_y, r_min_y) = (
+            self.switch_rotation_collection.get_real_collection_bounds()
+        )
+        return (
+            min(min_x, r_min_x),
+            max(max_x, r_max_x),
+            max(max_y, r_max_y),
+            min(min_y, r_min_y),
+        )
 
     def _board_y_band_edges(self) -> list[float]:
         # Every distinct row edge across the whole board (plus the top/bottom
         # margins), so a section's clip and its neighbour's clip sweep the exact
         # same y-bands and their shared seam lines up band for band.
         (b_min_x, b_max_x, b_max_y, b_min_y) = self._full_board_bounds()
-        top_margin_cells = (self.parameters.top_margin / self.parameters.switch_spacing) + 1
-        bottom_margin_cells = (self.parameters.bottom_margin / self.parameters.switch_spacing) + 1
+        top_margin_cells = (
+            self.parameters.top_margin / self.parameters.switch_spacing
+        ) + 1
+        bottom_margin_cells = (
+            self.parameters.bottom_margin / self.parameters.switch_spacing
+        ) + 1
         sweep_lo = b_min_y - bottom_margin_cells
         sweep_hi = b_max_y + top_margin_cells
         edges = {sweep_lo, sweep_hi}
@@ -836,7 +1006,9 @@ class Keyboard:
             boundaries.append(seam)
         return boundaries
 
-    def _section_seam_x(self, boundary_index: int, boundaries: list[float], mid_y: float) -> float:
+    def _section_seam_x(
+        self, boundary_index: int, boundaries: list[float], mid_y: float
+    ) -> float:
         # Shared seam x (mm) for the boundary between section boundary_index and
         # boundary_index+1 at row-midpoint mid_y (units). Starts from the nominal
         # straight seam and is routed so it never cuts a key on this row: pushed
@@ -860,19 +1032,30 @@ class Keyboard:
             else:
                 seam -= finger_depth
 
-        for item in self._iter_collection_items(self.switch_section_list[boundary_index]):
+        for item in self._iter_collection_items(
+            self.switch_section_list[boundary_index]
+        ):
             if (item.y - item.h) - 1e-9 <= mid_y <= item.y + 1e-9:
                 seam = max(seam, U(item.x + item.w))
         right_limit = None
-        for item in self._iter_collection_items(self.switch_section_list[boundary_index + 1]):
+        for item in self._iter_collection_items(
+            self.switch_section_list[boundary_index + 1]
+        ):
             if (item.y - item.h) - 1e-9 <= mid_y <= item.y + 1e-9:
                 left_edge = U(item.x)
-                right_limit = left_edge if right_limit is None else min(right_limit, left_edge)
+                right_limit = (
+                    left_edge if right_limit is None else min(right_limit, left_edge)
+                )
         if right_limit is not None:
             seam = min(seam, right_limit)
         return seam
 
-    def get_section_x_clip(self, section_number: int, remove_block_height: float, remove_block_z_offset: float) -> OpenSCADObject:
+    def get_section_x_clip(
+        self,
+        section_number: int,
+        remove_block_height: float,
+        remove_block_z_offset: float,
+    ) -> OpenSCADObject:
         # Carve one section out of the whole plate. Adjacent sections share a
         # single seam line (per y-band) - this section keeps the plate to the left
         # of its right seam and to the right of its left seam, and its neighbour
@@ -886,7 +1069,11 @@ class Keyboard:
 
         boundaries = self._section_x_boundaries()
 
-        plate_width = U(b_max_x - b_min_x) + self.parameters.left_margin + self.parameters.right_margin
+        plate_width = (
+            U(b_max_x - b_min_x)
+            + self.parameters.left_margin
+            + self.parameters.right_margin
+        )
         remove_block_length = (plate_width * 3.0) + 100.0
 
         edges = self._board_y_band_edges()
@@ -900,24 +1087,34 @@ class Keyboard:
 
             if section_number < section_count - 1:
                 right_seam = self._section_seam_x(section_number, boundaries, mid)
-                clip += down(remove_block_z_offset) ( right(right_seam) ( forward(y_offset) ( cube([remove_block_length, bar_height, remove_block_height]) ) ) )
+                clip += down(remove_block_z_offset)(
+                    right(right_seam)(
+                        forward(y_offset)(
+                            cube([remove_block_length, bar_height, remove_block_height])
+                        )
+                    )
+                )
 
             if section_number > 0:
                 left_seam = self._section_seam_x(section_number - 1, boundaries, mid)
-                clip += down(remove_block_z_offset) ( right(left_seam - remove_block_length) ( forward(y_offset) ( cube([remove_block_length, bar_height, remove_block_height]) ) ) )
+                clip += down(remove_block_z_offset)(
+                    right(left_seam - remove_block_length)(
+                        forward(y_offset)(
+                            cube([remove_block_length, bar_height, remove_block_height])
+                        )
+                    )
+                )
 
         return clip
 
-
     def get_bottom_section_remove_block(self, section_number: int) -> OpenSCADObject:
-
 
         # section = self.switch_section_list[section_number]
 
-        self.logger.debug('Get Section %d', section_number)
+        self.logger.debug("Get Section %d", section_number)
 
-        self.logger.debug('real_case_width: %f', self.parameters.real_case_width)
-        self.logger.debug('real_case_height: %f', self.parameters.real_case_height)
+        self.logger.debug("real_case_width: %f", self.parameters.real_case_width)
+        self.logger.debug("real_case_height: %f", self.parameters.real_case_height)
 
         if self.planned_boundaries is not None:
             # Split the bottom cover at the same footprint-planned boundaries as
@@ -928,12 +1125,18 @@ class Keyboard:
             last = len(cuts)
             rm = self.parameters.right_margin
             start_x = -1000.0 if section_number == 0 else cuts[section_number - 1] + rm
-            end_x = self.parameters.real_case_width + 1000.0 if section_number == last else cuts[section_number] + rm
+            end_x = (
+                self.parameters.real_case_width + 1000.0
+                if section_number == last
+                else cuts[section_number] + rm
+            )
         else:
             assert self.parameters.bottom_section_count is not None
-            section_size = self.parameters.real_case_width / self.parameters.bottom_section_count
+            section_size = (
+                self.parameters.real_case_width / self.parameters.bottom_section_count
+            )
 
-            self.logger.debug('section_size: %f', section_size)
+            self.logger.debug("section_size: %f", section_size)
 
             start_x = section_size * section_number
             end_x = start_x + section_size
@@ -941,34 +1144,43 @@ class Keyboard:
         (start_x, end_x) = self.get_screw_support_interference_offset(start_x, end_x)
 
         x_offset = start_x - self.parameters.right_margin
-        y_offset = self.parameters.real_case_height / 2 + self.parameters.real_case_height
+        y_offset = (
+            self.parameters.real_case_height / 2 + self.parameters.real_case_height
+        )
         assert self.parameters.case_height_extra_fill is not None
         z_offset = self.parameters.case_height_extra_fill / 2
-
 
         width = end_x - start_x
         height = self.parameters.real_case_height * 2
         thickness = self.parameters.case_height_extra_fill * 2
 
-        self.logger.debug('section: %d, x_offset: %f, width: %f, y_offset: %f', section_number, x_offset, width, y_offset)
+        self.logger.debug(
+            "section: %d, x_offset: %f, width: %f, y_offset: %f",
+            section_number,
+            x_offset,
+            width,
+            y_offset,
+        )
 
-        return right(x_offset) ( back(y_offset) ( down(z_offset) ( cube([width, height, thickness]) ) ) )
+        return right(x_offset)(
+            back(y_offset)(down(z_offset)(cube([width, height, thickness])))
+        )
 
-
-
-    def get_screw_support_interference_offset(self, start_x: float, end_x: float) -> tuple[float, float]:
+    def get_screw_support_interference_offset(
+        self, start_x: float, end_x: float
+    ) -> tuple[float, float]:
 
         assert self.body is not None
         for coord_string in self.body.screw_hole_info:
             screw_hole_info = self.body.screw_hole_info[coord_string]
 
-            screw_x = screw_hole_info['x']
+            screw_x = screw_hole_info["x"]
             # screw_y = screw_hole_info['y']
 
             # self.logger.debug('coord_string: %s, screw_x: %f, screw_y: %f', coord_string, screw_x, screw_y)
 
-            screw_hole_min_x = screw_x - screw_hole_info['support_directions']['left']
-            screw_hole_max_x = screw_x + screw_hole_info['support_directions']['right']
+            screw_hole_min_x = screw_x - screw_hole_info["support_directions"]["left"]
+            screw_hole_max_x = screw_x + screw_hole_info["support_directions"]["right"]
 
             # self.logger.debug('screw_hole_min_x: %f, screw_hole_max_x: %f', screw_hole_min_x, screw_hole_max_x)
 
@@ -998,16 +1210,11 @@ class Keyboard:
 
         return (start_x, end_x)
 
-
-
-
-
     def set_section(self, section_number: int) -> None:
         self.desired_section_number = section_number
 
     def get_top_section_count(self) -> int:
         return len(self.switch_section_list)
-
 
     def get_top_section_dimensions(self) -> list[tuple[float, float]]:
         # Width and height in mm of each top section's plate. Width is the kept
@@ -1030,12 +1237,19 @@ class Keyboard:
                 if hi - lo < 1e-9:
                     continue
                 mid = (lo + hi) / 2.0
-                lefts.append(board_left if i == 0 else self._section_seam_x(i - 1, boundaries, mid))
-                rights.append(board_right if i == section_count - 1 else self._section_seam_x(i, boundaries, mid))
+                lefts.append(
+                    board_left
+                    if i == 0
+                    else self._section_seam_x(i - 1, boundaries, mid)
+                )
+                rights.append(
+                    board_right
+                    if i == section_count - 1
+                    else self._section_seam_x(i, boundaries, mid)
+                )
             width = (max(rights) - min(lefts)) if lefts else 0.0
             dimensions.append((width, self.parameters.real_case_height))
         return dimensions
-
 
     def get_bottom_section_count(self) -> int:
         if self.planned_boundaries is not None:
