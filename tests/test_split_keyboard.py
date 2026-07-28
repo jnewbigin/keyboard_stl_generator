@@ -6,13 +6,15 @@ directly with hand-built column data (fast, no SolidPython). One end-to-end
 characterization test drives the real ``Keyboard`` on a committed layout to
 guard the wiring.
 """
+# pylint: disable=protected-access
+import itertools
 import json
 from pathlib import Path
 
 import pytest
 
-from parameters import Parameters
 from keyboard import Keyboard
+from parameters import Parameters
 
 SPACING = 19.05  # default switch_spacing (mm per key unit)
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -180,7 +182,7 @@ class TestSplitKeyboardEndToEnd:
 
 def _band_mids(keyboard):
     edges = keyboard._board_y_band_edges()
-    return [(lo + hi) / 2.0 for lo, hi in zip(edges, edges[1:]) if hi - lo > 1e-9]
+    return [(lo + hi) / 2.0 for lo, hi in itertools.pairwise(edges) if hi - lo > 1e-9]
 
 
 class TestPlanSectionCuts:
@@ -197,7 +199,7 @@ class TestPlanSectionCuts:
         cuts, ok = Keyboard.plan_section_cuts(0, 500, 200, [(180, 260)], 5)
         assert ok
         for c in cuts:
-            assert not (180 <= c <= 260), 'cut %s fell inside the cluster' % c
+            assert not (180 <= c <= 260), f'cut {c} fell inside the cluster'
 
     def test_cluster_wider_than_plate_is_flagged(self):
         cuts, ok = Keyboard.plan_section_cuts(0, 500, 200, [(50, 300)], 5)
@@ -210,7 +212,7 @@ class TestPlanSectionCuts:
         cuts, ok = Keyboard.plan_section_cuts(-4.3, 523.4, 300, [(111, 338)], 5.3)
         assert ok and len(cuts) == 2
         assert cuts[0] < 111 and cuts[1] > 338          # both cuts clear the cluster
-        edges = [-4.3] + cuts + [523.4]
+        edges = [-4.3, *cuts, 523.4]
         widths = [edges[i + 1] - edges[i] for i in range(len(edges) - 1)]
         assert max(widths) <= 300 + 1e-6
 

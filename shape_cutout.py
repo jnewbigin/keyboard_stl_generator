@@ -1,14 +1,13 @@
-from curses.textpad import rectangle
+import logging
+import sys
+
 from solid import *
 from solid import OpenSCADObject
 from solid.utils import *
 
-import logging
-import sys
-
-from cell import Cell
+from cell import Cell, CellProperties
 from parameters import Parameters
-from switch_config import SwitchConfig
+
 
 class ShapeCutout(Cell):
     """
@@ -39,12 +38,10 @@ class ShapeCutout(Cell):
     }
 
 
-    def __init__(self, x: float, y: float, shape_type: str, shape_parameters: dict, parameters: Parameters = Parameters()) -> None:
-        super().__init__(x, y, parameters = parameters)
+    def __init__(self, props: CellProperties, shape_type: str, shape_parameters: dict, parameters: Parameters) -> None:
+        super().__init__(props, parameters)
 
         self.logger = logging.getLogger().getChild(__name__)
-
-        self.parameters: Parameters = parameters
 
         self.shape_type = shape_type
         self.shape_parameters = shape_parameters
@@ -73,18 +70,18 @@ class ShapeCutout(Cell):
 
     def get_moved(self) -> OpenSCADObject:
         return right(self.x) ( forward(self.y) ( self.solid ) )
-    
+
     def circle_cutout(self) -> OpenSCADObject:
         this_function_name = sys._getframe().f_code.co_name
         self.logger = self.logger.getChild(this_function_name)
 
-        if 'r' in self.shape_parameters.keys():
+        if 'r' in self.shape_parameters:
             radius = self.shape_parameters['r']
-        elif 'd' in self.shape_parameters.keys():
+        elif 'd' in self.shape_parameters:
             radius = self.shape_parameters['d'] / 2
         else:
             self.logger.error('Either a radius "r" or diameter "d" key and value must be set when createing a cutsom circle cutout')
-            exit(1)
+            sys.exit(1)
 
         return circle(r = radius)
 
@@ -95,23 +92,23 @@ class ShapeCutout(Cell):
         width = 0
         height = 0
         # Both width and height defined. Use both
-        if 'width' in self.shape_parameters.keys() and 'height' in self.shape_parameters.keys():
-            self.logger.warn('both height and width supplied')
+        if 'width' in self.shape_parameters and 'height' in self.shape_parameters:
+            self.logger.warning('both height and width supplied')
             width = self.shape_parameters['width']
             height = self.shape_parameters['height']
-        elif 'width' in self.shape_parameters.keys():
-            self.logger.warn('only width supplied')
+        elif 'width' in self.shape_parameters:
+            self.logger.warning('only width supplied')
             width = self.shape_parameters['width']
             height = self.shape_parameters['width']
-        elif 'height' in self.shape_parameters.keys():
-            self.logger.warn('only height supplied')
+        elif 'height' in self.shape_parameters:
+            self.logger.warning('only height supplied')
             width = self.shape_parameters['height']
             height = self.shape_parameters['height']
         else:
             self.logger.error('At least a "width" or "height" must be provided for a custom rectangle cutout. Specifying only 1 of those will create a squatre')
-            exit(1)
+            sys.exit(1)
 
-        self.logger.warn('height: %f, width: %f', height, width)
+        self.logger.warning('height: %f, width: %f', height, width)
 
         return square([width, height])
 
@@ -122,17 +119,17 @@ class ShapeCutout(Cell):
         points = None
         psth = None
 
-        if 'points' in self.shape_parameters.keys():
+        if 'points' in self.shape_parameters:
             points = self.shape_parameters['points']
         else:
             self.logger.error('A list of points with key "points" must be provided for a custom polygon cutout')
-            exit(1)
+            sys.exit(1)
 
-        if 'path' in self.shape_parameters.keys():
+        if 'path' in self.shape_parameters:
             path = [self.shape_parameters['path']]
         else:
             self.logger.info('No path provided for custom polygon. Will use points in order they were listed')
             path = [range(len(points))]
-        
+
         return polygon(points, path)
 

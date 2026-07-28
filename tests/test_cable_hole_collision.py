@@ -9,8 +9,8 @@ got wrong.
 """
 import pytest
 
-from parameters import Parameters
 from body import Body
+from parameters import Parameters
 
 
 def make_body(**overrides):
@@ -19,11 +19,11 @@ def make_body(**overrides):
     real_max_x is pinned to 300mm and real_max_y to 200mm; margins/screw/cable
     settings can be overridden per test.
     """
-    params = dict(
-        left_margin=10, right_margin=10, top_margin=10, bottom_margin=10,
-        cable_hole=True, cable_hole_width=11,
-        screw_diameter=4, screw_hole_body_wall_width=2, screw_edge_inset=7,
-    )
+    params = {
+        "left_margin": 10, "right_margin": 10, "top_margin": 10, "bottom_margin": 10,
+        "cable_hole": True, "cable_hole_width": 11,
+        "screw_diameter": 4, "screw_hole_body_wall_width": 2, "screw_edge_inset": 7,
+    }
     params.update(overrides)
     parameters = Parameters(params)
     parameters.real_max_x = 300.0
@@ -112,10 +112,10 @@ def make_parameters(**overrides):
     case_height 18 / bottom_cover 1 / plate 1.111 / down_offset 1 leaves
     14.889mm below the plate for the hole height.
     """
-    params = dict(left_margin=10, right_margin=10, top_margin=10, bottom_margin=10,
-                  cable_hole=True, cable_hole_width=11, cable_hole_height=10,
-                  case_height=18, bottom_cover_thickness=1, plate_thickness=1.111,
-                  cable_hole_down_offset=1)
+    params = {"left_margin": 10, "right_margin": 10, "top_margin": 10, "bottom_margin": 10,
+                  "cable_hole": True, "cable_hole_width": 11, "cable_hole_height": 10,
+                  "case_height": 18, "bottom_cover_thickness": 1, "plate_thickness": 1.111,
+                  "cable_hole_down_offset": 1}
     params.update(overrides)
     parameters = Parameters(params)
     parameters.real_max_x = 300.0
@@ -150,9 +150,17 @@ class TestCableHoleWidthBounds:
         with pytest.raises(SystemExit):
             make_parameters(cable_hole_width=400).validate_cable_hole()
 
-    def test_zero_width_is_rejected(self):
+    def test_zero_width_is_rejected_on_load(self):
+        with pytest.raises(ValueError, match='cable_hole_width'):
+            make_parameters(cable_hole_width=0)
+
+    def test_zero_width_is_rejected_by_validate(self):
+        # The schema stops a zero reaching this from a parameter file, so set
+        # the attribute directly to reach the guard behind it.
+        parameters = make_parameters()
+        parameters.cable_hole_width = 0
         with pytest.raises(SystemExit):
-            make_parameters(cable_hole_width=0).validate_cable_hole()
+            parameters.validate_cable_hole()
 
 
 class TestCableHoleHeightBounds:
@@ -171,20 +179,26 @@ class TestCableHoleHeightBounds:
         with pytest.raises(SystemExit):
             make_parameters(cable_hole_height=13, cable_hole_down_offset=4).validate_cable_hole()
 
-    def test_zero_height_is_rejected(self):
+    def test_zero_height_is_rejected_on_load(self):
+        with pytest.raises(ValueError, match='cable_hole_height'):
+            make_parameters(cable_hole_height=0)
+
+    def test_zero_height_is_rejected_by_validate(self):
+        parameters = make_parameters()
+        parameters.cable_hole_height = 0
         with pytest.raises(SystemExit):
-            make_parameters(cable_hole_height=0).validate_cable_hole()
+            parameters.validate_cable_hole()
 
 
 class TestParametersCableHoleCenter:
     def test_center_defaults_to_key_field_centre(self):
-        parameters = Parameters(dict(left_margin=10, cable_hole=True))
+        parameters = Parameters({"left_margin": 10, "cable_hole": True})
         parameters.real_max_x = 300.0
         parameters.update_calculated_attributes()
         assert parameters.cable_hole_center_x() == 160.0
 
     def test_center_honours_explicit_offset(self):
-        parameters = Parameters(dict(left_margin=10, cable_hole=True, cable_hole_x_offset=25))
+        parameters = Parameters({"left_margin": 10, "cable_hole": True, "cable_hole_x_offset": 25})
         parameters.real_max_x = 300.0
         parameters.update_calculated_attributes()
         assert parameters.cable_hole_center_x() == 25

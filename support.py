@@ -1,26 +1,44 @@
+import logging
+
 from solid import *
 from solid import OpenSCADObject
 from solid.utils import *
 
-import logging
-
-from cell import Cell
+from cell import Cell, CellProperties
 from parameters import Parameters
+from support_properties import SupportProperties
+
 
 class Support(Cell):
 
-    def __init__(self, x: float, y: float, w: float, h: float, plate_thickness: float, support_bar_height: float, support_bar_width: float, support_bar_fillet: float = 0.0, rotation: float = 0.0,  r_x_offset: float = 0.0, r_y_offset: float = 0.0, z_offset: float = 0.0, set_to_origin: bool = True, cell_value: str = '', parameters: Parameters = Parameters()) -> None:
-        super().__init__(x, y, w, h, rotation,  r_x_offset, r_y_offset, z_offset = z_offset, cell_value = cell_value, parameters = parameters)
+    def __init__(self, props: CellProperties, support_props: SupportProperties, parameters: Parameters) -> None:
+        super().__init__(props, parameters)
 
         self.logger = logging.getLogger().getChild(__name__)
 
-        self.plate_thickness = plate_thickness
-        self.set_to_origin = set_to_origin
-        self.support_bar_height = support_bar_height
-        self.support_bar_width = support_bar_width
-        self.support_bar_fillet = support_bar_fillet
+        self.support_props = support_props
 
         self.solid = self.switch_support()
+
+    @property
+    def plate_thickness(self) -> float:
+        return self.support_props.plate_thickness
+
+    @property
+    def set_to_origin(self) -> bool:
+        return self.support_props.set_to_origin
+
+    @property
+    def support_bar_height(self) -> float:
+        return self.support_props.support_bar_height
+
+    @property
+    def support_bar_width(self) -> float:
+        return self.support_props.support_bar_width
+
+    @property
+    def support_bar_fillet(self) -> float:
+        return self.support_props.support_bar_fillet
 
     def __str__(self) -> str:
         return 'Support: ' + super().__str__()
@@ -42,7 +60,7 @@ class Support(Cell):
 
         d += self.switch_support_fillet()
 
-        if self.set_to_origin == True:
+        if self.set_to_origin:
             d = right(self.w_mm / 2) ( back(self.h_mm / 2) ( d ) )
 
         return d
@@ -76,14 +94,14 @@ class Support(Cell):
         )
 
         return band - opening
-        
+
     def switch_support(self) -> OpenSCADObject:
-        
+
         d = cube([self.w_mm, self.h_mm, self.plate_thickness], center = True)
 
-        if self.set_to_origin == True:
+        if self.set_to_origin:
             d = right(self.w_mm / 2) ( back(self.h_mm / 2) ( d ) )
-            
+
         d += self.switch_support_outline()
 
         return d

@@ -16,7 +16,7 @@ class TestKnownNames:
     def test_custom_switch_is_accepted(self):
         parameters = Parameters({'custom_switch': {'points': [[7, 7], [7, -7], [-7, -7], [-7, 7]]}})
 
-        assert parameters.custom_shape == True
+        assert parameters.custom_shape
 
     def test_no_parameters_at_all_is_fine(self):
         assert Parameters().case_height == 18

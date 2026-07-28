@@ -1,23 +1,26 @@
 #!/usr/bin/env python3
 
 import argparse
-from collections.abc import Sequence
-from typing import Any
 import json
-# import math
-import re
 import logging
 import os
+
+# import math
+import re
+
 # import os.path
 import subprocess
-# import time
+import sys
+from collections.abc import Sequence
+from typing import Any
 
+# import time
 from solid import *
 from solid.utils import *
 
-from parameters import Parameters
-from keyboard import Keyboard
 from cable import Cable
+from keyboard import Keyboard
+from parameters import Parameters
 
 # Preview colors given to each section so the pieces are distinguishable in the
 # per-section, exploded and assembled scad views. color() only affects the
@@ -25,7 +28,7 @@ from cable import Cable
 SECTION_COLORS = ['salmon', 'lightgreen', 'lightblue', 'gold', 'plum', 'cyan']
 
 # Set logger level variables
-console_logging_level = logging.WARN
+console_logging_level = logging.WARNING
 file_logging_level = logging.DEBUG
 
 
@@ -71,8 +74,8 @@ def CheckExt(choices: set[str], append: bool = False) -> type[argparse.Action]:
             assert isinstance(fname, str)
             ext = os.path.splitext(fname)[1][1:]
             if ext not in choices:
-                option_string = '({})'.format(option_string) if option_string else ''
-                parser.error("file doesn't end with one of {}{}".format(choices,option_string))
+                option_string = f'({option_string})' if option_string else ''
+                parser.error(f"file doesn't end with one of {choices}{option_string}")
             elif append:
                 file_names = list(getattr(namespace, self.dest, None) or [])
                 file_names.append(fname)
@@ -111,7 +114,7 @@ def main() -> None:
 
     # Get input file name only
     file_name_only = input_file_path.name
-    
+
     # Get layout name from file name
     layout_name = input_file_path.stem
 
@@ -121,19 +124,19 @@ def main() -> None:
     stl_folder_path = output_base_folder / 'stl'
 
     # Ensure all output folders exist
-    if output_base_folder.is_dir() == False:
+    if not output_base_folder.is_dir():
         output_base_folder.mkdir()
 
-    if scad_folder_path.is_dir() == False:
+    if not scad_folder_path.is_dir():
         scad_folder_path.mkdir()
 
-    if stl_folder_path.is_dir() == False:
+    if not stl_folder_path.is_dir():
         stl_folder_path.mkdir()
 
     logger.debug('layout_name: %s', str(layout_name))
     logger.debug('base_path: %s', str(base_path))
     logger.debug('file_name_only: %s', str(file_name_only))
-    
+
     # define output file extensions
     scad_postfix = '.scad'
     stl_postfix  = '.stl'
@@ -151,14 +154,14 @@ def main() -> None:
     try:
         keyboard_layout = input_file_path.read_text(encoding='utf-8')
     except UnicodeDecodeError:
-        message = 'Layout file %s is not utf-8 encoded' % (input_file_path)
+        message = f'Layout file {input_file_path} is not utf-8 encoded'
         logger.error(message)
         print('ERROR:', message)
-        exit(1)
+        sys.exit(1)
     except OSError as error:
         logger.error('Failed to read layout file: %s', error)
         print('ERROR:', error)
-        exit(1)
+        sys.exit(1)
 
     keyboard_layout_dict = None
 
@@ -172,7 +175,7 @@ def main() -> None:
         # Failed to parse the JSON test.
         # This most likely means that the keyboard-layout-editor raw output was provided
         # Attempt to modify that string to make it valid JSON
-        keyboard_layout = '[%s]' % (keyboard_layout)
+        keyboard_layout = f'[{keyboard_layout}]'
         keyboard_layout = re.sub(json_key_pattern, json_key_replace, keyboard_layout)
         try:
             keyboard_layout_dict = json.loads(keyboard_layout)
@@ -193,7 +196,7 @@ def main() -> None:
         except (OSError, TypeError, ValueError) as error:
             logger.error('Failed to load parameter files: %s', error)
             print('ERROR:', error)
-            exit(1)
+            sys.exit(1)
 
         logger.debug('parameter_dict: %s', str(parameter_dict))
 
@@ -204,8 +207,8 @@ def main() -> None:
     except (AttributeError, TypeError, ValueError) as error:
         logger.error('Failed to apply parameters: %s', error)
         print('ERROR:', error)
-        exit(1)
-    
+        sys.exit(1)
+
     # Create Keyboard instance
     keyboard = Keyboard(parameters)
 
@@ -219,7 +222,7 @@ def main() -> None:
     solid_object_dict: dict = {}
 
     # Create objects for each of the generated sections
-    if args.all_sections == True:
+    if args.all_sections:
         # Iterate over all sections generated and add all sections to solid_object_dict
         for section in range(keyboard.get_top_section_count()):
             # Set current section for generator
@@ -243,9 +246,9 @@ def main() -> None:
             if section < keyboard.get_bottom_section_count():
                 solid_object_dict[section]['bottom'] = color(section_color) ( render() ( keyboard.get_assembly(bottom = True) ) )
                 solid_object_dict[section]['case_bottom'] = color(section_color) ( render() ( keyboard.get_assembly(case_bottom = True) ) )
-            
+
     # Create exploded object
-    elif args.exploded == True:
+    elif args.exploded:
         solid_object_dict[-1] = {}
         solid_object_dict[-1]['top'] = union()
         solid_object_dict[-1]['plate'] = union()
@@ -259,7 +262,7 @@ def main() -> None:
             if section < keyboard.get_bottom_section_count():
                 solid_object_dict[-1]['bottom'] += color(section_color) ( up(5 * section) ( right(10 * section) ( render() ( keyboard.get_assembly(bottom = True) ) ) ) )
                 solid_object_dict[-1]['case_bottom'] += color(section_color) ( up(5 * section) ( right(10 * section) ( render() ( keyboard.get_assembly(case_bottom = True) ) ) ) )
-    
+
 
     # Create objects for a specified section
     elif args.section > -1:
@@ -290,20 +293,20 @@ def main() -> None:
         solid_object_dict['all']['all'] = render() ( keyboard.get_assembly(all = True) )
         solid_object_dict['all']['plate'] = render() ( keyboard.get_assembly(plate_only = True) )
         solid_object_dict['all']['case_bottom'] = render() ( keyboard.get_assembly(case_bottom = True) )
-    
+
     # Add global items that are not dependent on the sections or parts of the item to build
     solid_object_dict['global'] = {}
 
     # Generate a strain relief piece for the cable hole
-    if parameters.cable_hole == True:
+    if parameters.cable_hole:
         cable = Cable(parameters)
         solid_object_dict['global']['cable_holder_main'] = cable.holder_main()
         solid_object_dict['global']['cable_holder_clamp'] = cable.holder_clamp()
         solid_object_dict['global']['cable_holder_all'] = cable.holder_all()
 
     print(parameters)
-    print('Case Height: %f, Case Width: %f\n' % (parameters.real_case_height, parameters.real_case_width))
-    
+    print(f'Case Height: {parameters.real_case_height:f}, Case Width: {parameters.real_case_width:f}\n')
+
     logger.info('Case Height: %f, Case Width: %f', parameters.real_case_height, parameters.real_case_width)
     logger.info('Sections In Top: %d', keyboard.get_top_section_count())
     logger.info('Sections In Bottom: %d', keyboard.get_bottom_section_count())
@@ -320,9 +323,9 @@ def main() -> None:
     switch_type_for_filename = ''
     stab_type_for_filename = ''
 
-    for section in solid_object_dict.keys():
+    for section in solid_object_dict:
 
-        if args.switch_type_in_filename == True:
+        if args.switch_type_in_filename:
             switch_type_for_filename = '_' + parameters.switch_type
             stab_type_for_filename = '_' + parameters.stabilizer_type
 
@@ -332,15 +335,15 @@ def main() -> None:
         if isinstance(section, str) and section == 'global':
             switch_type_for_filename = ''
             stab_type_for_filename = ''
-        
+
         # If the current object dict section is an int greater than -1 add the section number to the filename
         if isinstance(section, int) and section > -1:
             section_postfix = '_section_%d' % (section)
-        
-        if args.exploded == True:
+
+        if args.exploded:
             section_postfix = '_exploded'
 
-        for part_name in solid_object_dict[section].keys():
+        for part_name in solid_object_dict[section]:
             part_name_formatted = '_' + part_name
 
             scad_file_name = scad_folder_path / (layout_name + section_postfix + part_name_formatted + switch_type_for_filename + stab_type_for_filename + scad_postfix)
@@ -365,10 +368,10 @@ def main() -> None:
                     logger.debug('Render STL from SCAD')
                     logger.info('Generate stl file with name %s from %s', stl_file_name, scad_file_name)
 
-                    openscad_command_list = ['openscad', '-o', '%s' % (stl_file_name), '%s' % (scad_file_name)]
+                    openscad_command_list = ['openscad', '-o', f'{stl_file_name}', f'{scad_file_name}']
                     subprocess_dict[stl_file_name] = subprocess.Popen(openscad_command_list)
-    
-    
+
+
     ################################################################
     #  Write assembly views
     ################################################################
@@ -377,7 +380,7 @@ def main() -> None:
     # keyboard. The sections are clipped in place, so including them reconstructs
     # the whole board. The assembly file sits alongside the section files, so a
     # bare filename include resolves relative to it.
-    if args.all_sections == True:
+    if args.all_sections:
         assembly_switch_postfix = ('_' + parameters.switch_type) if args.switch_type_in_filename else ''
         assembly_stab_postfix = ('_' + parameters.stabilizer_type) if args.switch_type_in_filename else ''
         for part_name, section_files in assembly_includes.items():
@@ -387,7 +390,7 @@ def main() -> None:
             # from every include.
             with open(assembly_file_name, 'w') as assembly_file:
                 for section_file in section_files:
-                    assembly_file.write('include <%s>\n' % (section_file))
+                    assembly_file.write(f'include <{section_file}>\n')
             print('Generated assembly scad file with name', assembly_file_name)
 
 
@@ -397,16 +400,16 @@ def main() -> None:
     if args.render:
         logger.debug(subprocess_dict)
         running = True
-        while running == True:
+        while running:
             running = False
-            for stl_file_name in subprocess_dict.keys():
+            for stl_file_name in subprocess_dict:
                 p = subprocess_dict[stl_file_name]
                 if p is not None:
                     # running = True
                     rcode = None
                     try:
                         rcode = p.wait(.1)
-                    except subprocess.TimeoutExpired as err:
+                    except subprocess.TimeoutExpired:
                         running = True
                     if rcode is not None:
                         logger.info('Render Complete: file: %s', stl_file_name)
@@ -421,8 +424,7 @@ def main() -> None:
     # Summary of the sections the board was split into and their size relative to
     # the configured build plate.
     section_dimensions = keyboard.get_top_section_dimensions()
-    print('\nSection summary (build plate %.1f x %.1f mm):'
-          % (parameters.x_build_size, parameters.y_build_size))
+    print(f'\nSection summary (build plate {parameters.x_build_size:.1f} x {parameters.y_build_size:.1f} mm):')
     print('  %d top section(s), %d bottom section(s)'
           % (keyboard.get_top_section_count(), keyboard.get_bottom_section_count()))
     for section_number, (width, height) in enumerate(section_dimensions):

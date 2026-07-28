@@ -2,6 +2,7 @@
 - [How it Works](#how-it-works)
 - [Setup](#setup)
   - [Requirements](#requirements)
+  - [Development checks](#development-checks)
   - [Usage](#usage)
   - [Parameters](#parameters)
     - [Splitting Parameters Across Files](#splitting-parameters-across-files)
@@ -38,6 +39,19 @@ The program can then generate a number of different items. The entire case can b
   poetry install
   ```
 - **[OpenSCAD](https://openscad.org/)**: In order to render STL files you will have to have OpenSCAD installed and the OpenSCAD executable must be on your path. OpenSCAD downloads can be found here https://openscad.org/downloads.html
+
+## Development checks
+
+```
+poetry run ruff check .      # fast lint; --fix applies the safe fixes
+poetry run pylint *.py tests/*.py
+poetry run mypy
+poetry run pytest
+```
+
+Ruff settings live in `pyproject.toml` and pylint's in `.pylintrc`. Design
+metrics (argument counts, statement counts and so on) are pylint's job, so the
+`PL` rules are left out of the ruff selection to avoid duplicate reports.
 
 ## Usage
 - Here is an example of the program cli usage
@@ -85,6 +99,7 @@ The program can then generate a number of different items. The entire case can b
 
 ### Schema
 - [parameters.schema.json](/parameters.schema.json) describes every parameter, so an editor can offer completion and flag mistakes as you type. The program itself also rejects a parameter it does not recognise, rather than building the model from the default
+- The program checks every parameter file against the same schema as it loads, so a value of the wrong type or outside the allowed range is reported by name instead of being used. A quoted `"false"` is a string rather than a boolean, and would otherwise turn a feature on
 - Point an editor at it by adding a `$schema` key to the parameter file
   ```
   {

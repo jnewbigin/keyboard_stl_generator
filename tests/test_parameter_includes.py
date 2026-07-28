@@ -231,4 +231,4 @@ class TestParameterObject:
 
         assert parameters.case_height == 18
         assert parameters.switch_type == 'mx'
-        assert hasattr(parameters, Parameters.INCLUDE_KEY) == False
+        assert not hasattr(parameters, Parameters.INCLUDE_KEY)

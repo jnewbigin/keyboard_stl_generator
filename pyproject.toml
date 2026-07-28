@@ -9,6 +9,7 @@ dependencies = [
     "setuptools (>=59.6.0)",
     "solidpython (>=1.1.3)",
     "json5 (>=0.14.0,<0.15.0)",
+    "jsonschema (>=4.26.0,<5.0.0)",
 ]
 
 [tool.poetry]
@@ -17,7 +18,38 @@ package-mode = false
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0"
 mypy = "^1.11"
-jsonschema = "^4.26.0"
+ruff = "^0.14"
+pylint = "^4.0"
+
+[tool.ruff]
+line-length = 150
+extend-exclude = ["stubs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RET", "ARG", "RUF", "LOG", "G"]
+# Design metrics (PL*) are left to pylint, which has the thresholds set in
+# .pylintrc. solidpython is designed to be star-imported: cube(), up(), union()
+# and the rest of the geometry builders only reach the namespace that way.
+ignore = [
+    "F403",
+    "F405",
+    "G004",
+    # Debt. Each needs a judgement call rather than a rewrite; see .pylintrc for
+    # the design-metric equivalents.
+    "ARG002",
+    "B008",
+    "B905",
+    "E722",
+    "F841",
+    "PLC0206",
+    "RET504",
+    "RUF012",
+    "RUF059",
+    "SIM115",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ARG001", "ARG002"]
 
 [tool.mypy]
 python_version = "3.14"

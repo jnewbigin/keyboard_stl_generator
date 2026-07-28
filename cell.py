@@ -1,12 +1,63 @@
+import logging
+import math
+from dataclasses import dataclass
+
 from solid import *
 from solid import OpenSCADObject
 from solid.utils import *
 
-import logging
-import math
-import json
-import sys
 from parameters import Parameters
+
+
+@dataclass(frozen=True)
+class CellProperties:
+    x: float
+    y: float
+    w: float = 1.0
+    h: float = 1.0
+    rotation: float = 0.0
+    z_offset: float = 0.0
+    cell_value: str = ''
+
+    @property
+    def x_min(self) -> float:
+        return self.x
+
+    @property
+    def x_max(self) -> float:
+        return self.x + self.w
+
+    @property
+    def y_min(self) -> float:
+        return self.y - self.h
+
+    @property
+    def y_max(self) -> float:
+        return self.y
+
+    @property
+    def center_x(self) -> float:
+        return self.x + (self.w / 2)
+
+    @property
+    def center_y(self) -> float:
+        return self.y - (self.h / 2)
+
+    @property
+    def end_x(self) -> float:
+        return self.x + self.w
+
+    @property
+    def end_y(self) -> float:
+        return self.y - self.h
+
+    @property
+    def switch_length(self) -> float:
+        return max(self.w, self.h)
+
+    @property
+    def vertical(self) -> bool:
+        return self.h > self.w
 
 
 class Cell:
@@ -36,31 +87,17 @@ class Cell:
     # COSTAR_NOTCH_SWITCH_SIDE_X_OFFSET = 1.65
     # SIDE_NOTCH_FAR_SIDE_X_OFFSET = 4.2
 
-    def __init__(self, x: float, y: float, w: float = 1.0, h: float = 1.0, rotation: float = 0.0,  r_x_offset: float = 0.0, r_y_offset: float = 0.0, z_offset: float = 0.0, cell_value: str = '', parameters: Parameters = Parameters()) -> None:
+    CORNER_ORDER = ['top_left', 'top_right', 'bottom_right', 'bottom_left']
+
+    def __init__(self, props: CellProperties, parameters: Parameters) -> None:
 
         self.logger = logging.getLogger().getChild(__name__)
 
+        self.props = props
         self.parameters = parameters
 
         # Set by subclasses (Switch, Support, ...) to the built OpenSCAD geometry.
         self.solid: OpenSCADObject
-
-        self.x = x
-        self.y = y
-        self.w = w
-        self.h = h
-
-        self.z_offset = z_offset
-
-        self.x_min = self.x
-        self.x_max = self.x + self.w
-        self.y_min = self.y - self.h
-        self.y_max = self.y
-
-        self.center_x = self.x + (self.w / 2)
-        self.center_y = self.y - (self.h / 2)
-
-        self.rotaton = rotation
 
         self.rotation_info: dict[str, dict[str, float]] = {
             'top_left': {
@@ -77,42 +114,108 @@ class Cell:
             }
         }
 
-        self.corner_order = ['top_left', 'top_right', 'bottom_right', 'bottom_left']
-
-        self.end_x = self.x + self.w
-        self.end_y = self.y - self.h
-
-        self.x_start_mm = self.parameters.U(x)
-        self.x_end_mm = self.x_start_mm + self.parameters.U(w)
-
-        self.y_start_mm = self.parameters.U(y)
-        self.y_end_mm = self.y_start_mm + self.parameters.U(h)
-
-        self.h_mm = self.parameters.U(self.h)
-        self.w_mm = self.parameters.U(self.w)
-
-        self.switch_length = self.w
-        if self.h > self.w:
-            self.switch_length = self.h
-
-        self.vertical = False
-
-        if self.h > self.w:
-            self.vertical = True
-        
-        self.cell_value = cell_value
-
-        if self.rotaton != 0.0:
+        if self.rotation != 0.0:
             self.build_rotation_info()
 
-        
-            
+
+    @property
+    def x(self) -> float:
+        return self.props.x
+
+    @property
+    def y(self) -> float:
+        return self.props.y
+
+    @property
+    def w(self) -> float:
+        return self.props.w
+
+    @property
+    def h(self) -> float:
+        return self.props.h
+
+    @property
+    def rotation(self) -> float:
+        return self.props.rotation
+
+    @property
+    def z_offset(self) -> float:
+        return self.props.z_offset
+
+    @property
+    def cell_value(self) -> str:
+        return self.props.cell_value
+
+    @property
+    def x_min(self) -> float:
+        return self.props.x_min
+
+    @property
+    def x_max(self) -> float:
+        return self.props.x_max
+
+    @property
+    def y_min(self) -> float:
+        return self.props.y_min
+
+    @property
+    def y_max(self) -> float:
+        return self.props.y_max
+
+    @property
+    def center_x(self) -> float:
+        return self.props.center_x
+
+    @property
+    def center_y(self) -> float:
+        return self.props.center_y
+
+    @property
+    def end_x(self) -> float:
+        return self.props.end_x
+
+    @property
+    def end_y(self) -> float:
+        return self.props.end_y
+
+    @property
+    def switch_length(self) -> float:
+        return self.props.switch_length
+
+    @property
+    def vertical(self) -> bool:
+        return self.props.vertical
+
+    @property
+    def x_start_mm(self) -> float:
+        return self.parameters.U(self.props.x)
+
+    @property
+    def x_end_mm(self) -> float:
+        return self.x_start_mm + self.parameters.U(self.props.w)
+
+    @property
+    def y_start_mm(self) -> float:
+        return self.parameters.U(self.props.y)
+
+    @property
+    def y_end_mm(self) -> float:
+        return self.y_start_mm + self.parameters.U(self.props.h)
+
+    @property
+    def h_mm(self) -> float:
+        return self.parameters.U(self.props.h)
+
+    @property
+    def w_mm(self) -> float:
+        return self.parameters.U(self.props.w)
+
     # @staticmethod
     # def u(u_value):
     #     return u_value * Cell.SWITCH_SPACING
 
     def __str__(self) -> str:
-        return '%s (%f, %f)' % (self.cell_value, self.x, self.y)
+        return f'{self.cell_value} ({self.x:f}, {self.y:f})'
 
     def get(self) -> OpenSCADObject:
         return self.solid
@@ -120,70 +223,62 @@ class Cell:
     def get_moved(self) -> OpenSCADObject:
         return up(self.z_offset) ( right(self.x_start_mm) ( forward(self.y_start_mm) ( self.solid ) ) )
 
-    def get_start_x(self) -> float: 
-        if self.rotaton == 0.0:
+    def get_start_x(self) -> float:
+        if self.rotation == 0.0:
             return self.x
-        else:
-            return self.get_rotated_start_x()
+        return self.get_rotated_start_x()
 
-    
+
     def get_start_y(self) -> float:
-        if self.rotaton == 0.0:
+        if self.rotation == 0.0:
             return self.y
-        else:
-            return self.get_rotated_start_y()
+        return self.get_rotated_start_y()
 
-    def get_end_x(self) -> float: 
-        if self.rotaton == 0.0:
+    def get_end_x(self) -> float:
+        if self.rotation == 0.0:
             return self.end_x
-        else:
-            return self.get_rotated_end_x()
+        return self.get_rotated_end_x()
 
-    
+
     def get_end_y(self) -> float:
-        if self.rotaton == 0.0:
+        if self.rotation == 0.0:
             return self.end_y
-        else:
-            return self.get_rotated_end_y()
+        return self.get_rotated_end_y()
 
     def get_rotated_start_x(self) -> float:
         min_x = 1000.0
-        for corner_name in self.corner_order:
-            if 'rotated_x' in self.rotation_info[corner_name].keys():
+        for corner_name in self.CORNER_ORDER:
+            if 'rotated_x' in self.rotation_info[corner_name]:
                 rotated_x = float(self.rotation_info[corner_name]['rotated_x'])
-                if rotated_x < min_x:
-                    min_x = rotated_x
+                min_x = min(min_x, rotated_x)
 
         return min_x
 
     def get_rotated_end_x(self) -> float:
         max_x = -1000.0
-        for corner_name in self.corner_order:
-            if 'rotated_x' in self.rotation_info[corner_name].keys():
+        for corner_name in self.CORNER_ORDER:
+            if 'rotated_x' in self.rotation_info[corner_name]:
                 rotated_x = float(self.rotation_info[corner_name]['rotated_x'])
-                if rotated_x > max_x:
-                    max_x = rotated_x
+                max_x = max(max_x, rotated_x)
 
         return max_x
 
     def get_rotated_start_y(self) -> float:
         max_y = -1000.0
-        for corner_name in self.corner_order:
-            if 'rotated_y' in self.rotation_info[corner_name].keys():
+        for corner_name in self.CORNER_ORDER:
+            if 'rotated_y' in self.rotation_info[corner_name]:
                 rotated_y = float(self.rotation_info[corner_name]['rotated_y'])
-                if rotated_y > max_y:
-                    max_y = rotated_y
-        
+                max_y = max(max_y, rotated_y)
+
         return max_y
 
     def get_rotated_end_y(self) -> float:
         min_y = 1000.0
-        for corner_name in self.corner_order:
-            if 'rotated_y' in self.rotation_info[corner_name].keys():
+        for corner_name in self.CORNER_ORDER:
+            if 'rotated_y' in self.rotation_info[corner_name]:
                 rotated_y = float(self.rotation_info[corner_name]['rotated_y'])
-                if rotated_y < min_y:
-                    min_y = rotated_y
-        
+                min_y = min(min_y, rotated_y)
+
         return min_y
 
     def hypotenuse(self, adjacent: float, opposite: float) -> float:
@@ -193,54 +288,49 @@ class Cell:
         try:
             tan = float(opposite) / float(adjacent)
         except ZeroDivisionError:
-            
+
             # angle = 90
-            if self.rotaton < 0.0:
-                angle = 90.0
-            else:
-                angle = -90.0
-            
-            return angle
+            return 90.0 if self.rotation < 0.0 else -90.0
+
 
         angle = math.atan( tan )
-        angle = math.degrees(angle)
-        return angle
+        return math.degrees(angle)
 
     def get_opposite(self, angle: float, hypotenuse: float) -> float:
         sin_angle = math.sin(math.radians(angle))
         opposite = sin_angle * hypotenuse
-        if self.rotaton < 0.0:
+        if self.rotation < 0.0:
             opposite = -(opposite)
-        
+
         return opposite
 
     def get_adjacent(self, angle: float, hypotenuse: float) -> float:
         cos_angle = math.cos(math.radians(angle))
         adjacent = cos_angle * hypotenuse
-        if self.rotaton < 0.0:
+        if self.rotation < 0.0:
             adjacent = -(adjacent)
-        
+
         return adjacent
 
 
     def get_rotation_info_points(self) -> list[list[float]]:
         points_orig = []
         points = []
-        
-        for corner_name in self.corner_order:
+
+        for corner_name in self.CORNER_ORDER:
             # self.logger.debug(corner_name)
             points_orig.append([self.rotation_info[corner_name]['rotated_x'], self.rotation_info[corner_name]['rotated_y']])
             points.append([self.parameters.U(self.rotation_info[corner_name]['rotated_x']), self.parameters.U(self.rotation_info[corner_name]['rotated_y'])])
-            
+
         return points
-    
-    
+
+
     def build_rotation_info(self) -> None:
 
         # if self.cell_value in ('CC', 'DD', 'HH', 'II', 'JJ', 'LL'):
         #     self.logger.debug('Build Rotation Info for key %s', str(self))
 
-        for corner_name in self.rotation_info.keys():
+        for corner_name in self.rotation_info:
             adjacent = 0.0
             opposite = 0.0
             if corner_name == 'top_left':
@@ -258,7 +348,7 @@ class Cell:
 
             hypotenuse = self.hypotenuse(adjacent, opposite)
             hypotenuse_start_angle = self.get_hypotenuse_start_angle(adjacent, opposite)
-            hypotenuse_rotated_angle = hypotenuse_start_angle - self.rotaton
+            hypotenuse_rotated_angle = hypotenuse_start_angle - self.rotation
 
             self.rotation_info[corner_name]['x'] = adjacent
             self.rotation_info[corner_name]['y'] = opposite

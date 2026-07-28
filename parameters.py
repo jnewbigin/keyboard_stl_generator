@@ -5,22 +5,27 @@ from collections.abc import Sequence
 from pathlib import Path, PurePath
 
 import json5
+import jsonschema
 
 from switch_config import SwitchConfig
-
 
 # from cell import Cell
 
 logger = logging.getLogger(__name__)
 
 
-class Parameters():
+class Parameters:
 
     # SWITCH_SPACING = 19.05
 
     # Keys consumed by the loader itself rather than set as attributes.
     INCLUDE_KEY = 'include'
     SCHEMA_KEY = '$schema'
+
+    SCHEMA_PATH = Path(__file__).resolve().parent / 'parameters.schema.json'
+
+    _schema: dict | None = None
+    _validator: jsonschema.protocols.Validator | None = None
 
     PARAMETER_FILE_SUFFIXES = ('.json', '.json5')
 
@@ -50,7 +55,7 @@ class Parameters():
         #     'switch_type': 'mx_openable',
         #     'stabilizer_type': 'cherry',
 
-        #     'custom_shape': False, 
+        #     'custom_shape': False,
         #     'custom_shape_points': None,
         #     'custom_shape_path': None,
 
@@ -205,7 +210,7 @@ class Parameters():
             'logger', 'parameter_dict', 'switch_config',
             'min_x', 'max_x', 'min_y', 'max_y',
             'real_max_x', 'real_max_y',
-            # 'real_case_width', 'real_case_height', 
+            # 'real_case_width', 'real_case_height',
             'case_height_extra', 'case_height_base_removed', 'case_height_extra_fill', 'side_margin_diff',
             'top_margin_diff', 'screw_tap_hole_diameter', 'screw_hole_body_diameter', 'screw_hole_body_radius',
             'x_screw_width', 'y_screw_width', 'bottom_section_count', 'screw_hole_body_support_end_x',
@@ -214,7 +219,7 @@ class Parameters():
         ]
         for attr_name in self.__dict__:
             if attr_name not in ignore_attr_names:
-                output += '%s: %s\n' % (attr_name, str(self.__dict__[attr_name]))
+                output += f'{attr_name}: {self.__dict__[attr_name]!s}\n'
 
         return output
 
@@ -242,8 +247,8 @@ class Parameters():
         self.screw_tap_hole_diameter = self.screw_diameter - 0.35
         self.screw_hole_body_diameter = self.screw_diameter + (self.screw_hole_body_wall_width * 2)
         self.screw_hole_body_radius = self.screw_hole_body_diameter / 2
-        self.x_screw_width = self.real_case_width - ((self.screw_edge_x_inset * 2))  # + self.screw_diameter)
-        self.y_screw_width = self.real_case_height - ((self.screw_edge_y_inset * 2))  # + self.screw_diameter)
+        self.x_screw_width = self.real_case_width - (self.screw_edge_x_inset * 2)  # + self.screw_diameter)
+        self.y_screw_width = self.real_case_height - (self.screw_edge_y_inset * 2)  # + self.screw_diameter)
         self.bottom_section_count = math.ceil(self.real_case_width / self.x_build_size)
         self.screw_hole_body_support_end_x = (
                                                          self.case_height_extra_fill / self.screw_hole_body_support_x_factor) + self.screw_hole_body_radius
@@ -269,7 +274,7 @@ class Parameters():
             self.logger.debug('Custom Screw Default: screw_edge_x_inset: %f, screw_edge_y_inset: %f',
                               self.screw_edge_x_inset, self.screw_edge_y_inset)
 
-        if self.custom_pcb == True:
+        if self.custom_pcb:
             half_u = self.U(1) / 2
 
             # Get the top left coordinates for the PCB itself.
@@ -326,17 +331,18 @@ class Parameters():
     def build_attr_from_dict(self, parameter_dict: dict) -> None:
 
         self.check_parameter_names(parameter_dict)
+        self.check_parameter_types(parameter_dict)
 
-        for param in parameter_dict.keys():
+        for param in parameter_dict:
             value = parameter_dict[param]
 
             if param == 'custom_switch':
-                if 'points' not in value.keys():
+                if 'points' not in value:
                     raise AttributeError('A set of "points" must exist in the "custom_switch" to use a custom switch')
 
                 self.custom_shape_points = value['points']
 
-                if 'path' in value.keys():
+                if 'path' in value:
                     self.custom_shape_path = value['path']
                 else:
                     self.logger.warning(
@@ -355,6 +361,52 @@ class Parameters():
 
         self.validate_parameters()
 
+    @classmethod
+    def schema(cls) -> dict:
+        if cls._schema is None:
+            cls._schema = json5.loads(cls.SCHEMA_PATH.read_text(encoding='utf-8'))
+        return cls._schema
+
+    @staticmethod
+    def is_finite_number(checker: object, instance: object) -> bool:
+        # JSON5 accepts Infinity and NaN, which JSON does not, so the schema
+        # type on its own lets them through. NaN then spreads silently through
+        # every calculation into the model, and Infinity reaches math.floor.
+        del checker
+        if not jsonschema.Draft202012Validator.TYPE_CHECKER.is_type(instance, 'number'):
+            return False
+        assert isinstance(instance, (int, float))
+        return math.isfinite(instance)
+
+    @classmethod
+    def validator(cls) -> jsonschema.protocols.Validator:
+        if cls._validator is None:
+            type_checker = jsonschema.Draft202012Validator.TYPE_CHECKER.redefine(
+                'number', cls.is_finite_number)
+            validator_class = jsonschema.validators.extend(
+                jsonschema.Draft202012Validator, type_checker=type_checker)
+            cls._validator = validator_class(cls.schema())
+        return cls._validator
+
+    @classmethod
+    def check_parameter_types(cls, parameter_dict: dict) -> None:
+        # Values reach attributes through setattr, so nothing else checks that
+        # what a parameter file supplies is the right type. A string "false"
+        # would otherwise read as enabled at every truth test.
+        problems = []
+        for error in sorted(cls.validator().iter_errors(parameter_dict), key=str):
+            name = '.'.join(str(part) for part in error.absolute_path)
+
+            if isinstance(error.instance, float) and not math.isfinite(error.instance):
+                message = f'{error.instance} is not a finite number'
+            else:
+                message = error.message
+
+            problems.append(f'{name}: {message}' if name else message)
+
+        if len(problems) > 0:
+            raise ValueError('Invalid parameters: {}'.format('; '.join(problems)))
+
     def check_parameter_names(self, parameter_dict: dict) -> None:
         # Every parameter has an attribute of the same name set up in __init__,
         # so anything else is a typo or a name that no longer exists. Setting it
@@ -362,17 +414,17 @@ class Parameters():
         known_names = set(self.__dict__.keys()) | set(self.SPECIAL_PARAMETERS)
 
         problems = []
-        for name in parameter_dict.keys():
+        for name in parameter_dict:
             if name in known_names:
                 continue
 
-            if name in self.RENAMED_PARAMETERS.keys():
-                problems.append('%s was renamed to %s' % (name, self.RENAMED_PARAMETERS[name]))
+            if name in self.RENAMED_PARAMETERS:
+                problems.append(f'{name} was renamed to {self.RENAMED_PARAMETERS[name]}')
             else:
-                problems.append('%s is not a parameter' % (name))
+                problems.append(f'{name} is not a parameter')
 
         if len(problems) > 0:
-            raise ValueError('Unknown parameters: %s' % ('; '.join(problems)))
+            raise ValueError('Unknown parameters: {}'.format('; '.join(problems)))
 
     def set_parameter_dict(self, parameter_dict: dict) -> None:
         self.parameter_dict = parameter_dict
@@ -386,8 +438,8 @@ class Parameters():
         # in list order before the file's own keys, so a file always overrides
         # what it includes.
         if isinstance(file_paths, (str, PurePath)):
-            raise TypeError('load_parameter_files takes a list of parameter files, not a single %s. '
-                            'Pass [%r] instead' % (type(file_paths).__name__, str(file_paths)))
+            raise TypeError(f'load_parameter_files takes a list of parameter files, not a single {type(file_paths).__name__}. '
+                            f'Pass [{str(file_paths)!r}] instead')
 
         # A file reached down more than one include path is only resolved once.
         resolved_files: dict[Path, dict] = {}
@@ -407,8 +459,8 @@ class Parameters():
         real_path = file_path.resolve()
 
         if real_path in include_chain:
-            chain = ' -> '.join(str(path) for path in include_chain + [real_path])
-            raise ValueError('Circular parameter file include: %s' % (chain))
+            chain = ' -> '.join(str(path) for path in [*include_chain, real_path])
+            raise ValueError(f'Circular parameter file include: {chain}')
 
         if real_path in resolved_files:
             return dict(resolved_files[real_path])
@@ -424,10 +476,10 @@ class Parameters():
             # so plain JSON parameter files keep working unchanged.
             file_dict = json5.loads(file_text)
         except ValueError as error:
-            raise ValueError('Failed to parse parameter file %s: %s' % (file_path, error)) from error
+            raise ValueError(f'Failed to parse parameter file {file_path}: {error}') from error
 
-        if isinstance(file_dict, dict) == False:
-            raise TypeError('Parameter file %s must contain a JSON object' % (file_path))
+        if not isinstance(file_dict, dict):
+            raise TypeError(f'Parameter file {file_path} must contain a JSON object')
 
         file_dict.pop(cls.SCHEMA_KEY, None)
         include_names = cls.include_names(file_dict.pop(cls.INCLUDE_KEY, []), file_path)
@@ -437,7 +489,7 @@ class Parameters():
             # Includes are resolved against the including file so a shared set
             # of base files can be included from anywhere.
             include_path = file_path.parent / include_name
-            parameter_dict.update(cls.resolve_parameter_file(include_path, include_chain + [real_path],
+            parameter_dict.update(cls.resolve_parameter_file(include_path, [*include_chain, real_path],
                                                              resolved_files))
 
         parameter_dict.update(file_dict)
@@ -448,23 +500,19 @@ class Parameters():
 
     @classmethod
     def check_parameter_file(cls, file_path: Path, include_chain: list[Path]) -> None:
-        if len(include_chain) > 0:
-            described = 'Parameter file %s included from %s' % (file_path, include_chain[-1])
-        else:
-            described = 'Parameter file %s' % (file_path)
+        described = f'Parameter file {file_path} included from {include_chain[-1]}' if len(include_chain) > 0 else f'Parameter file {file_path}'
 
         if file_path.is_dir():
-            raise IsADirectoryError('%s is a directory, not a parameter file' % (described))
+            raise IsADirectoryError(f'{described} is a directory, not a parameter file')
 
-        if file_path.exists() == False:
-            raise FileNotFoundError('%s does not exist' % (described))
+        if not file_path.exists():
+            raise FileNotFoundError(f'{described} does not exist')
 
-        if file_path.is_file() == False:
-            raise ValueError('%s is not a regular file' % (described))
+        if not file_path.is_file():
+            raise ValueError(f'{described} is not a regular file')
 
         if file_path.suffix not in cls.PARAMETER_FILE_SUFFIXES:
-            raise ValueError('%s must be named %s'
-                             % (described, ' or '.join(cls.PARAMETER_FILE_SUFFIXES)))
+            raise ValueError('{} must be named {}'.format(described, ' or '.join(cls.PARAMETER_FILE_SUFFIXES)))
 
     @classmethod
     def include_names(cls, include_value: object, file_path: Path) -> list[str]:
@@ -475,12 +523,11 @@ class Parameters():
         elif isinstance(include_value, list) and all(isinstance(name, str) for name in include_value):
             names = list(include_value)
         else:
-            raise TypeError('"%s" in %s must be a file name or a list of file names'
-                            % (cls.INCLUDE_KEY, file_path))
+            raise TypeError(f'"{cls.INCLUDE_KEY}" in {file_path} must be a file name or a list of file names')
 
         for name in names:
             if name.strip() == '':
-                raise ValueError('"%s" in %s contains an empty file name' % (cls.INCLUDE_KEY, file_path))
+                raise ValueError(f'"{cls.INCLUDE_KEY}" in {file_path} contains an empty file name')
 
         return names
 
@@ -489,7 +536,7 @@ class Parameters():
         try:
             return file_path.read_text(encoding='utf-8')
         except UnicodeDecodeError as error:
-            raise ValueError('Parameter file %s is not utf-8 encoded' % (file_path)) from error
+            raise ValueError(f'Parameter file {file_path} is not utf-8 encoded') from error
 
     # def get_param(self, parameter_name):
 
@@ -516,23 +563,23 @@ class Parameters():
                 parameter_error = True
                 error_message += 'Screw count must be even\n'
 
-        if self.switch_type not in self.switch_config.switch_type_function_dict.keys():
+        if self.switch_type not in self.switch_config.switch_type_function_dict:
             parameter_error = True
-            error_message += 'switch type %s is not a valid switch type' % (self.switch_type)
+            error_message += f'switch type {self.switch_type} is not a valid switch type'
 
-        if self.stabilizer_type not in self.switch_config.stab_type_function_dict.keys():
+        if self.stabilizer_type not in self.switch_config.stab_type_function_dict:
             parameter_error = True
-            error_message += 'stabilizer type %s is not a valid stabilizer type' % (self.stabilizer_type)
+            error_message += f'stabilizer type {self.stabilizer_type} is not a valid stabilizer type'
 
-        if parameter_error == True:
+        if parameter_error:
             print('ERROR:', error_message)
-            exit(1)
+            sys.exit(1)
 
     def validate_cable_hole(self) -> None:
         # Runs from set_dimensions, once the real case size is known. The top
         # piece spans x = 0 .. real_case_width and z = 0 (case floor) up to the
         # plate underside, so the hole must sit fully inside both.
-        if self.cable_hole != True:
+        if not self.cable_hole:
             return
 
         assert self.case_height_base_removed is not None
@@ -551,15 +598,13 @@ class Parameters():
         half_width = self.cable_hole_width / 2
         if center - half_width < 0 or center + half_width > self.real_case_width:
             parameter_error = True
-            error_message += ('cable hole (centre %.2fmm, width %.2fmm) does not fit within the %.2fmm case width\n'
-                              % (center, self.cable_hole_width, self.real_case_width))
+            error_message += (f'cable hole (centre {center:.2f}mm, width {self.cable_hole_width:.2f}mm) does not fit within the {self.real_case_width:.2f}mm case width\n')
 
         available_height = self.case_height_base_removed - self.plate_thickness - self.cable_hole_down_offset
         if self.cable_hole_height > available_height:
             parameter_error = True
-            error_message += ('cable hole (height %.2fmm) does not fit within the %.2fmm available below the plate\n'
-                              % (self.cable_hole_height, available_height))
+            error_message += (f'cable hole (height {self.cable_hole_height:.2f}mm) does not fit within the {available_height:.2f}mm available below the plate\n')
 
-        if parameter_error == True:
+        if parameter_error:
             print('ERROR:', error_message)
-            exit(1)
+            sys.exit(1)

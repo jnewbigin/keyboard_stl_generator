@@ -1,25 +1,20 @@
+# import graphviz
+import logging
 from collections.abc import KeysView
-from fileinput import close
 from pathlib import Path
 from typing import cast
+
 from solid import *
 from solid import OpenSCADObject
 from solid.utils import *
 
-# import graphviz
-
-import logging
-import sys
-
-from switch import Switch
-from support import Support
-from support_cutout import SupportCutout
 from cell import Cell
+from switch import Switch
 
 
 class ItemCollection:
     def __init__(self, rotation: float = 0.0) -> None:
-        
+
         self.logger = logging.getLogger().getChild(__name__)
 
         self.collection: dict = {}
@@ -37,17 +32,17 @@ class ItemCollection:
         return self.collection[rx][ry]
 
     def add_item(self, x_offset: float, y_offset: float, cell: Cell, rx: float = 0.0, ry: float = 0.0) -> None:
-        if rx not in self.collection.keys():
+        if rx not in self.collection:
             self.collection[rx] = {}
 
-        if ry not in self.collection[rx].keys():
+        if ry not in self.collection[rx]:
             self.collection[rx][ry] = {}
 
-        if x_offset not in self.collection[rx][ry].keys():
+        if x_offset not in self.collection[rx][ry]:
             self.collection[rx][ry][x_offset] = {}
 
         if rx != 0.0 or ry != 0.0:
-            self.logger.debug('Adding item to collection with rx = {}, ry = {}'.format(rx, ry))
+            self.logger.debug(f'Adding item to collection with rx = {rx}, ry = {ry}')
 
         self.collection[rx][ry][x_offset][y_offset] = cell
 
@@ -71,19 +66,19 @@ class ItemCollection:
         return self.collection[rx][ry][x_offset][y_offset].get_moved()
 
     def collection_has_keys(self, rx: float = 0.0, ry: float | None = None, x: float | None = None, y: float | None = None) -> bool:
-        if rx not in self.collection.keys():
-            self.logger.debug('Collection has no rx = {}'.format(rx))
+        if rx not in self.collection:
+            self.logger.debug(f'Collection has no rx = {rx}')
             return False
-        if ry is not None and ry not in self.collection[rx].keys():
-            self.logger.debug('Collection has no ry = {}'.format(ry))
+        if ry is not None and ry not in self.collection[rx]:
+            self.logger.debug(f'Collection has no ry = {ry}')
             return False
-        if x is not None and x not in self.collection[rx][ry].keys():
-            self.logger.debug('Collection has no x = {}'.format(x))
+        if x is not None and x not in self.collection[rx][ry]:
+            self.logger.debug(f'Collection has no x = {x}')
             return False
-        if y is not None and y not in self.collection[rx][ry][x].keys():
-            self.logger.debug('Collection has no y = {}'.format(y))
+        if y is not None and y not in self.collection[rx][ry][x]:
+            self.logger.debug(f'Collection has no y = {y}')
             return False
-        
+
         return True
 
     def get_rx_list(self) -> KeysView:
@@ -92,19 +87,16 @@ class ItemCollection:
     def get_ry_list_in_rx(self, rx: float) -> KeysView | list:
         if self.collection_has_keys(rx):
             return self.collection[rx].keys()
-        else:
-            return []
+        return []
 
     def get_x_list_in_rx_ry(self, rx: float = 0.0, ry: float = 0.0) -> KeysView | list:
         if self.collection_has_keys(rx, ry):
             return self.collection[rx][ry].keys()
-        else:
-            return []
+        return []
     def get_y_list_in_rx_ry_x(self, x: float, rx: float = 0.0, ry: float = 0.0) -> KeysView | list:
         if self.collection_has_keys(rx, ry, x):
             return self.collection[rx][ry][x].keys()
-        else:
-            return []
+        return []
 
     def get_x_list(self, rx: float = 0.0, ry: float = 0.0) -> KeysView | list:
         return self.get_x_list_in_rx_ry(rx, ry)
@@ -127,22 +119,21 @@ class ItemCollection:
 
     def get_min_y(self, rx: float = 0.0, ry: float = 0.0) -> float:
         min_y = 0
-        
+
         for x in self.get_x_list(rx, ry):
             col_min_y = min(self.get_y_list_in_rx_ry_x(x, rx, ry))
 
-            if col_min_y < min_y:
-                min_y = col_min_y    
+            min_y = min(min_y, col_min_y)
         return min_y
 
     def get_collection_bounds(self, rx: float = 0.0, ry: float = 0.0) -> tuple[float, float, float, float]:
-        
+
 
         min_y = 1000.0
         max_y = -1000.0
         max_x = -1000.0
         min_x = 1000.0
-        
+
         for x in self.get_x_list(rx, ry):
             for y in self.get_y_list_in_x(x, rx, ry):
                 cell = self.get_item(x, y, rx, ry)
@@ -152,17 +143,13 @@ class ItemCollection:
                 end_y = cell.get_end_y()
 
                 # self.logger.debug('end_x: %f, end_y: %f', end_x, end_y)
-                if start_x < min_x:
-                    min_x = start_x
+                min_x = min(min_x, start_x)
 
-                if end_x > max_x:
-                    max_x = end_x
+                max_x = max(max_x, end_x)
 
-                if start_y > max_y:
-                    max_y = start_y
+                max_y = max(max_y, start_y)
 
-                if end_y < min_y:
-                    min_y = end_y
+                min_y = min(min_y, end_y)
 
         self.logger.debug('min_x: %f, max_x: %f, max_y: %f, min_y: %f', min_x, max_x, max_y, min_y)
         return (min_x, max_x, max_y, min_y)
@@ -177,9 +164,9 @@ class ItemCollection:
                 solid += temp_solid
         return solid
 
-    
+
     def set_collection_neighbors(self, neighbor_group: str = 'local') -> None:
-        
+
 
         self.logger.debug('Set %s neighbors', neighbor_group)
         for rx in self.get_rx_list():
@@ -188,15 +175,15 @@ class ItemCollection:
                     for y in self.get_y_list_in_rx_ry_x(x, rx, ry):
                         current_switch = cast(Switch, self.get_item(x, y, rx, ry))
                         all_neighbors_set = current_switch.get_all_neighbors_set(neighbor_group = neighbor_group)
-                        if all_neighbors_set == False:
+                        if not all_neighbors_set:
                             # self.logger.debug('set_collection_neighbors call set_item_neighbor for switch %s', str(current_switch))
                             self.set_item_neighbor(current_switch, neighbor_group = neighbor_group)
 
-    
-    
+
+
     def set_item_neighbor(self, item: Switch, neighbor_group: str = 'local', tabs: str = '') -> None:
         # self.logger.debug('%sSet neighbors for switch %s', tabs, str(item))
-        
+
         x_min = item.x
         x_max = item.x + item.w
         y_min = item.y - item.h
@@ -244,12 +231,12 @@ class ItemCollection:
                         if sib_x_max > x_min and sib_x_min < x_max and sib_y_max <= y_min:
                             neighbor_list_dict['bottom'].append(sibling_switch)
                             # bottom_neighbor_offset = y_min - sib_y_max
-        
 
-        for direction in neighbor_list_dict.keys():
+
+        for direction in neighbor_list_dict:
             # self.logger.debug('direction: %s', direction)
             offset = 0.0
-            
+
             if len(neighbor_list_dict[direction]) > 0:
                 closest_neighbor: Switch | None = None
 
@@ -286,15 +273,15 @@ class ItemCollection:
         # pos = '%f,%f!' % (item.center_x, item.center_y)
         # self.dot_recurse.node(item.cell_value, pos = pos)
 
-        if all_neighbors_set == True:
-            for direction in neighbor_list_dict.keys():
+        if all_neighbors_set:
+            for direction in neighbor_list_dict:
                 neighbor: Switch | None
                 neighbor = item.get_neighbor(direction, neighbor_group = neighbor_group)
 
                 if neighbor is not None:
                     neighbor_all_neighbors_set = neighbor.get_all_neighbors_set(neighbor_group = neighbor_group)
 
-                    if neighbor_all_neighbors_set == False:
+                    if not neighbor_all_neighbors_set:
                         # self.logger.debug('\t\tset neighbors for neighbor switch %s', str(neighbor))
                         # pos = '%f,%f!' % (neighbor.center_x, neighbor.center_y)
                         # self.dot_recurse.node(neighbor.cell_value, pos = pos)
@@ -317,13 +304,13 @@ class ItemCollection:
                 rotated_polygon = polygon(poly_points, poly_path)
 
                 solid += rotated_polygon
-                
+
         return solid
 
 
 
     def render_graph(self, output_filename: Path) -> None:
-        
+
 
         # self.dot.render(output_filename, engine = 'neato')
 
@@ -335,8 +322,8 @@ class ItemCollection:
 
 
     def neighbor_check(self, neighbor_group: str = 'local', output_filename: str = '') -> None:
-        
-        
+
+
         # self.dot = graphviz.Digraph(comment='Keyboard')
         for rx in self.get_rx_list():
             for ry in self.get_ry_list_in_rx(rx):
@@ -365,7 +352,7 @@ class ItemCollection:
 
                                 if item_cell_value != reverse_neighbor_cell_value:
                                     self.logger.debug('Cell "%s" %s neighbor "%s" reverse neighbor %s has has different value %s', item_cell_value, direction, neighbor_cell_value, reverse_direction, reverse_neighbor_cell_value)
-        
+
         # self.dot.render(output_filename, engine = 'neato')
 
     def has_global_neighbor_section(self, neighbor_name: str = '') -> bool | None:
