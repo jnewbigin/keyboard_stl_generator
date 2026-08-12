@@ -1,6 +1,7 @@
 
 
 import logging
+import math
 
 # from cell import Cell
 
@@ -28,6 +29,7 @@ class SwitchConfig:
     MAIN_BODY_SWITCH_SIDE_X_OFFSET = 3.375
     COSTAR_NOTCH_SWITCH_SIDE_X_OFFSET = 1.65
     SIDE_NOTCH_FAR_SIDE_X_OFFSET = 4.2
+    STAB_SCREW_HOLE_SEGMENTS = 24
 
     def __init__(self, kerf: float = 0.0,  switch_type: str = 'mx_openable', stabilizer_type: str = 'cherry_costar', custom_shape: bool = False, custom_shape_points: list | None = None, custom_shape_path: list | None = None) -> None:
 
@@ -407,20 +409,28 @@ class SwitchConfig:
 
         return None, None
 
+    @staticmethod
+    def circle_points(x: float, y: float, radius: float, segments: int) -> list:
+        return [
+            [
+                x + radius * math.cos(2 * math.pi * i / segments),
+                y + radius * math.sin(2 * math.pi * i / segments),
+            ]
+            for i in range(segments)
+        ]
+
     def custom_stab_cutout(self, key_width: float = 1.0) -> tuple:
         s = self.get_cherry_stab_cutout_spacing(key_width = key_width)
 
         if s != -1:
-            radius = 0.8
+            radius = 1.0 # M2 clearance
             distance = -7.2
             d = 0.2 # the hole needs to shifted a fraction
-            # the screw hole cutout
-            stab_cutout_poly_points = [
-                [s - radius - self.kerf + d, distance - radius - self.kerf], # 0
-                [s + radius + self.kerf + d, distance - radius - self.kerf], # 1
-                [s + radius + self.kerf + d, distance + radius + self.kerf], # 2
-                [s - radius - self.kerf + d, distance + radius + self.kerf] # 3
-            ]
+            # the screw hole cutout. Scaling by the apothem puts the flats of
+            # the polygon on the radius instead of inside it, so the hole is
+            # never undersized
+            hole_radius = (radius + self.kerf) / math.cos(math.pi / self.STAB_SCREW_HOLE_SEGMENTS)
+            stab_cutout_poly_points = self.circle_points(s + d, distance, hole_radius, self.STAB_SCREW_HOLE_SEGMENTS)
 
             # the main stab cutout
             hwidth = 3.6 # width = 6
