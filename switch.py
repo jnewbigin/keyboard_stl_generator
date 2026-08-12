@@ -242,7 +242,7 @@ class Switch(Cell):
         # support_infill
         for advanced in advanced_poly_points:
             action, poly_points = advanced
-            poly_path = [range(len(switch_poly_points))]
+            poly_path = [range(len(poly_points))]
             advanced_polygon = polygon(poly_points, poly_path)
 
             if action == "cutout":
