@@ -11,7 +11,12 @@ from support_properties import SupportProperties
 
 class SupportCutout(Cell):
 
-    def __init__(self, props: CellProperties, support_props: SupportProperties, parameters: Parameters) -> None:
+    def __init__(
+        self,
+        props: CellProperties,
+        support_props: SupportProperties,
+        parameters: Parameters,
+    ) -> None:
         super().__init__(props, parameters)
 
         self.logger = logging.getLogger().getChild(__name__)
@@ -36,7 +41,7 @@ class SupportCutout(Cell):
     #     return u_value * self.SWITCH_SPACING
 
     def __str__(self) -> str:
-        return 'SupportCutout: ' + super().__str__()
+        return "SupportCutout: " + super().__str__()
 
     def support_cutout(self) -> OpenSCADObject:
         # Adjacent support cutouts tile the whole plate edge-to-edge and the
@@ -49,7 +54,15 @@ class SupportCutout(Cell):
         # z_offset so the cavity spans the full taller skirt once get_moved()
         # lifts it by z_offset.
         skirt_drop = self.support_bar_height + self.z_offset
-        d = down(skirt_drop / 2) ( cube([self.w_mm + eps, self.h_mm + eps, skirt_drop + self.plate_thickness + eps], center = True) )
+        d = down(skirt_drop / 2)(
+            cube(
+                [
+                    self.w_mm + eps,
+                    self.h_mm + eps,
+                    skirt_drop + self.plate_thickness + eps,
+                ],
+                center=True,
+            )
+        )
 
-        return right(self.w_mm / 2) ( back(self.h_mm / 2) ( d ) )
-
+        return right(self.w_mm / 2)(back(self.h_mm / 2)(d))

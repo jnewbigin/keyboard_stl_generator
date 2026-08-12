@@ -1,9 +1,8 @@
-
-
 import logging
 import math
 
 # from cell import Cell
+
 
 class SwitchConfig:
 
@@ -31,7 +30,15 @@ class SwitchConfig:
     SIDE_NOTCH_FAR_SIDE_X_OFFSET = 4.2
     STAB_SCREW_HOLE_SEGMENTS = 24
 
-    def __init__(self, kerf: float = 0.0,  switch_type: str = 'mx_openable', stabilizer_type: str = 'cherry_costar', custom_shape: bool = False, custom_shape_points: list | None = None, custom_shape_path: list | None = None) -> None:
+    def __init__(
+        self,
+        kerf: float = 0.0,
+        switch_type: str = "mx_openable",
+        stabilizer_type: str = "cherry_costar",
+        custom_shape: bool = False,
+        custom_shape_points: list | None = None,
+        custom_shape_path: list | None = None,
+    ) -> None:
 
         self.logger = logging.getLogger().getChild(__name__)
 
@@ -47,10 +54,14 @@ class SwitchConfig:
         self.custom_shape_path = custom_shape_path
 
         if self.custom_shape:
-            self.switch_type = 'custom'
+            self.switch_type = "custom"
 
-        self.logger.info('self.custom_shape: %s, self.custom_shape_points: %s, self.custom_shape_path: %s', str(self.custom_shape), str(self.custom_shape_points), str(self.custom_shape_path))
-
+        self.logger.info(
+            "self.custom_shape: %s, self.custom_shape_points: %s, self.custom_shape_path: %s",
+            str(self.custom_shape),
+            str(self.custom_shape_points),
+            str(self.custom_shape_path),
+        )
 
         # The type of switch that should be rendered
         # Default os mx_openable: The standard cutout to allow opening a switch when it is soldered to a PCB
@@ -60,11 +71,11 @@ class SwitchConfig:
         #       mx_alps: supports mx and alps switches. Allows opening PCB mounted mx switches
         #       alps: standard alps cutout
         self.switch_type_function_dict = {
-            'mx_openable': self.mx_openable_switch_cutout,
-            'mx': self.mx_switch_cutout,
-            'mx_alps': self.mx_alps_switch_cutout,
-            'alps': self.alps_switch_cutout,
-            'custom': self.custom_switch_cutout
+            "mx_openable": self.mx_openable_switch_cutout,
+            "mx": self.mx_switch_cutout,
+            "mx_alps": self.mx_alps_switch_cutout,
+            "alps": self.alps_switch_cutout,
+            "custom": self.custom_switch_cutout,
         }
 
         # The type of stabilizer that should be rendered:
@@ -75,57 +86,79 @@ class SwitchConfig:
         #       costar: support for just costar stabilizers
         #       alps: suport for the alsp stabilizer
         self.stab_type_function_dict = {
-            'cherry_costar': self.cherry_costar_stab_cutout,
-            'cherry': self.cherry_stab_cutout,
-            'costar': self.costar_stab_cutout,
-            'alps': self.alps_stab_cutout,
-            'custom': self.custom_stab_cutout,
+            "cherry_costar": self.cherry_costar_stab_cutout,
+            "cherry": self.cherry_stab_cutout,
+            "costar": self.costar_stab_cutout,
+            "alps": self.alps_stab_cutout,
+            "custom": self.custom_stab_cutout,
         }
-
 
         self.cherry_support_cutout_h = 3.5
         self.cherry_stab_bar_width = 2.5
-
 
     def get_switch_poly_info(self) -> list | None:
 
         self.logger.info(self.switch_type)
         if self.switch_type in self.switch_type_function_dict:
             return self.switch_type_function_dict[self.switch_type]()
-        raise ValueError(f'switch type {self.switch_type} is not a valid switch type')
-
-
+        raise ValueError(f"switch type {self.switch_type} is not a valid switch type")
 
     def get_stab_poly_info(self, key_width: float = 1.0) -> tuple:
         if self.stabilizer_type in self.stab_type_function_dict:
             return self.stab_type_function_dict[self.stabilizer_type](key_width)
-        raise ValueError(f'stabilizer type {self.stabilizer_type} is not a valid stabilizer type')
-
-
-
+        raise ValueError(
+            f"stabilizer type {self.stabilizer_type} is not a valid stabilizer type"
+        )
 
     def mx_openable_switch_cutout(self) -> list:
         return [
-            [self.SQUARE_SIZE_HALF + self.kerf, -self.SQUARE_SIZE_HALF -  self.kerf], # 0
-            [self.SQUARE_SIZE_HALF + self.kerf, -self.CLIP_NOTCH_Y_MAX -  self.kerf], # 1
-            [self.CLIP_NOTCH_X + self.kerf, -self.CLIP_NOTCH_Y_MAX -  self.kerf], # 2
-            [self.CLIP_NOTCH_X + self.kerf, -self.CLIP_NOTCH_Y_MIN + self.kerf], # 3
-            [self.SQUARE_SIZE_HALF + self.kerf, -self.CLIP_NOTCH_Y_MIN + self.kerf], # 4
-            [self.SQUARE_SIZE_HALF + self.kerf, self.CLIP_NOTCH_Y_MIN -  self.kerf], # 5
-            [self.CLIP_NOTCH_X + self.kerf, self.CLIP_NOTCH_Y_MIN -  self.kerf], # 6
-            [self.CLIP_NOTCH_X + self.kerf, self.CLIP_NOTCH_Y_MAX + self.kerf], # 7
-            [self.SQUARE_SIZE_HALF + self.kerf, self.CLIP_NOTCH_Y_MAX + self.kerf], # 8
-            [self.SQUARE_SIZE_HALF + self.kerf, self.SQUARE_SIZE_HALF + self.kerf], # 9
-            [-self.SQUARE_SIZE_HALF -  self.kerf, self.SQUARE_SIZE_HALF + self.kerf], # 10
-            [-self.SQUARE_SIZE_HALF -  self.kerf, self.CLIP_NOTCH_Y_MAX + self.kerf], # 11
-            [-self.CLIP_NOTCH_X -  self.kerf, self.CLIP_NOTCH_Y_MAX + self.kerf], # 12
-            [-self.CLIP_NOTCH_X -  self.kerf, self.CLIP_NOTCH_Y_MIN -  self.kerf], # 13
-            [-self.SQUARE_SIZE_HALF -  self.kerf, self.CLIP_NOTCH_Y_MIN -  self.kerf], # 14
-            [-self.SQUARE_SIZE_HALF -  self.kerf, -self.CLIP_NOTCH_Y_MIN + self.kerf], # 15
-            [-self.CLIP_NOTCH_X -  self.kerf, -self.CLIP_NOTCH_Y_MIN + self.kerf], # 16
-            [-self.CLIP_NOTCH_X -  self.kerf, -self.CLIP_NOTCH_Y_MAX -  self.kerf], # 17
-            [-self.SQUARE_SIZE_HALF -  self.kerf, -self.CLIP_NOTCH_Y_MAX -  self.kerf], # 18
-            [-self.SQUARE_SIZE_HALF -  self.kerf, -self.SQUARE_SIZE_HALF -  self.kerf] # 19
+            [
+                self.SQUARE_SIZE_HALF + self.kerf,
+                -self.SQUARE_SIZE_HALF - self.kerf,
+            ],  # 0
+            [
+                self.SQUARE_SIZE_HALF + self.kerf,
+                -self.CLIP_NOTCH_Y_MAX - self.kerf,
+            ],  # 1
+            [self.CLIP_NOTCH_X + self.kerf, -self.CLIP_NOTCH_Y_MAX - self.kerf],  # 2
+            [self.CLIP_NOTCH_X + self.kerf, -self.CLIP_NOTCH_Y_MIN + self.kerf],  # 3
+            [
+                self.SQUARE_SIZE_HALF + self.kerf,
+                -self.CLIP_NOTCH_Y_MIN + self.kerf,
+            ],  # 4
+            [self.SQUARE_SIZE_HALF + self.kerf, self.CLIP_NOTCH_Y_MIN - self.kerf],  # 5
+            [self.CLIP_NOTCH_X + self.kerf, self.CLIP_NOTCH_Y_MIN - self.kerf],  # 6
+            [self.CLIP_NOTCH_X + self.kerf, self.CLIP_NOTCH_Y_MAX + self.kerf],  # 7
+            [self.SQUARE_SIZE_HALF + self.kerf, self.CLIP_NOTCH_Y_MAX + self.kerf],  # 8
+            [self.SQUARE_SIZE_HALF + self.kerf, self.SQUARE_SIZE_HALF + self.kerf],  # 9
+            [
+                -self.SQUARE_SIZE_HALF - self.kerf,
+                self.SQUARE_SIZE_HALF + self.kerf,
+            ],  # 10
+            [
+                -self.SQUARE_SIZE_HALF - self.kerf,
+                self.CLIP_NOTCH_Y_MAX + self.kerf,
+            ],  # 11
+            [-self.CLIP_NOTCH_X - self.kerf, self.CLIP_NOTCH_Y_MAX + self.kerf],  # 12
+            [-self.CLIP_NOTCH_X - self.kerf, self.CLIP_NOTCH_Y_MIN - self.kerf],  # 13
+            [
+                -self.SQUARE_SIZE_HALF - self.kerf,
+                self.CLIP_NOTCH_Y_MIN - self.kerf,
+            ],  # 14
+            [
+                -self.SQUARE_SIZE_HALF - self.kerf,
+                -self.CLIP_NOTCH_Y_MIN + self.kerf,
+            ],  # 15
+            [-self.CLIP_NOTCH_X - self.kerf, -self.CLIP_NOTCH_Y_MIN + self.kerf],  # 16
+            [-self.CLIP_NOTCH_X - self.kerf, -self.CLIP_NOTCH_Y_MAX - self.kerf],  # 17
+            [
+                -self.SQUARE_SIZE_HALF - self.kerf,
+                -self.CLIP_NOTCH_Y_MAX - self.kerf,
+            ],  # 18
+            [
+                -self.SQUARE_SIZE_HALF - self.kerf,
+                -self.SQUARE_SIZE_HALF - self.kerf,
+            ],  # 19
         ]
 
         # x_right = self.kerf + self.SQUARE_SIZE_HALF - self.CORNER_CIRCLE_EDGE_OFFSET
@@ -133,92 +166,75 @@ class SwitchConfig:
         # y_top = self.kerf + self.SQUARE_SIZE_HALF - self.CORNER_CIRCLE_EDGE_OFFSET
         # y_bottom = self.kerf - self.SQUARE_SIZE_HALF + self.CORNER_CIRCLE_EDGE_OFFSET
 
-
         # d = polygon(poly_points, poly_path)
         # d += right(x_right) ( forward(y_top) ( circle(r = .4) ) )
         # d += right(x_right) ( forward(y_bottom) ( circle(r = .4) ) )
         # d += right(x_left) ( forward(y_bottom) ( circle(r = .4) ) )
         # d += right(x_left) ( forward(y_top) ( circle(r = .4) ) )
 
-
-
     def mx_switch_cutout(self) -> list:
         return [
-            [7 + self.kerf, -7 -  self.kerf], # 0
-            [7 + self.kerf, 7 + self.kerf], # 1
-            [-7 -  self.kerf, 7 + self.kerf], # 2
-            [-7 -  self.kerf, -7 -  self.kerf] # 3
-
+            [7 + self.kerf, -7 - self.kerf],  # 0
+            [7 + self.kerf, 7 + self.kerf],  # 1
+            [-7 - self.kerf, 7 + self.kerf],  # 2
+            [-7 - self.kerf, -7 - self.kerf],  # 3
         ]
-
-
-
 
     def mx_alps_switch_cutout(self) -> list:
         return [
-            [7 + self.kerf, -7 -  self.kerf], # 0
-            [7 + self.kerf, -6.4 -  self.kerf], # 1
-            [7.8 + self.kerf, -6.4 -  self.kerf], # 2
-            [7.8 + self.kerf, 6.4 + self.kerf], # 3
-            [7 + self.kerf, 6.4 + self.kerf], # 4
-            [7 + self.kerf, 7 + self.kerf], # 5
-            [-7 -  self.kerf, 7 + self.kerf], # 6
-            [-7 -  self.kerf, 6.4 + self.kerf], # 7
-            [-7.8 -  self.kerf, 6.4 + self.kerf], # 8
-            [-7.8 -  self.kerf, -6.4 -  self.kerf], # 9
-            [-7 -  self.kerf, -6.4 -  self.kerf], # 10
-            [-7 -  self.kerf, -7 -  self.kerf] # 11
+            [7 + self.kerf, -7 - self.kerf],  # 0
+            [7 + self.kerf, -6.4 - self.kerf],  # 1
+            [7.8 + self.kerf, -6.4 - self.kerf],  # 2
+            [7.8 + self.kerf, 6.4 + self.kerf],  # 3
+            [7 + self.kerf, 6.4 + self.kerf],  # 4
+            [7 + self.kerf, 7 + self.kerf],  # 5
+            [-7 - self.kerf, 7 + self.kerf],  # 6
+            [-7 - self.kerf, 6.4 + self.kerf],  # 7
+            [-7.8 - self.kerf, 6.4 + self.kerf],  # 8
+            [-7.8 - self.kerf, -6.4 - self.kerf],  # 9
+            [-7 - self.kerf, -6.4 - self.kerf],  # 10
+            [-7 - self.kerf, -7 - self.kerf],  # 11
         ]
-
-
 
     def alps_switch_cutout(self) -> list:
         return [
-            [7.8 + self.kerf, -6.4 -  self.kerf], # 0
-            [7.8 + self.kerf, 6.4 + self.kerf], # 1
-            [-7.8 -  self.kerf, 6.4 + self.kerf], # 2
-            [-7.8 -  self.kerf, -6.4 -  self.kerf] # 3
+            [7.8 + self.kerf, -6.4 - self.kerf],  # 0
+            [7.8 + self.kerf, 6.4 + self.kerf],  # 1
+            [-7.8 - self.kerf, 6.4 + self.kerf],  # 2
+            [-7.8 - self.kerf, -6.4 - self.kerf],  # 3
         ]
-
-
-
 
     def custom_switch_cutout(self) -> list | None:
 
         poly_points = self.custom_shape_points
 
-        self.logger.info('custom_switch_cutout: %s', str(poly_points))
+        self.logger.info("custom_switch_cutout: %s", str(poly_points))
 
         return poly_points
 
-
-
-
-
     def get_cherry_stab_cutout_spacing(self, key_width: float = 1.0) -> float:
 
-        if key_width >= 2.0 and key_width < 3.0: # 2u, 2.25u, 2.5u, 2.75u
+        if key_width >= 2.0 and key_width < 3.0:  # 2u, 2.25u, 2.5u, 2.75u
             return 11.9
-        if key_width == 3: # 3u
+        if key_width == 3:  # 3u
             return 19.05
-        if key_width == 4: # 4u
+        if key_width == 4:  # 4u
             return 28.575
-        if key_width == 4.5: # 4.5u
+        if key_width == 4.5:  # 4.5u
             return 34.671
-        if key_width == 5.5: # 5.5u
+        if key_width == 5.5:  # 5.5u
             return 42.8625
-        if key_width == 6: # 6u
+        if key_width == 6:  # 6u
             return 47.5
-        if key_width == 6.25: # 6.25u
+        if key_width == 6.25:  # 6.25u
             return 50
-        if key_width == 6.5: # 6.5u
+        if key_width == 6.5:  # 6.5u
             return 52.38
-        if key_width == 7: # 7u
+        if key_width == 7:  # 7u
             return 57.15
-        if key_width in {8, 9, 10}: # 8u
+        if key_width in {8, 9, 10}:  # 8u
             return 66.675
         return -1
-
 
     def get_alps_stab_cutout_spacing(self, key_width: float = 1.0) -> float:
 
@@ -232,51 +248,123 @@ class SwitchConfig:
             return 45.3
         return -1
 
-
     def cherry_costar_stab_cutout(self, key_width: float = 1.0) -> tuple:
-
 
         support_cutout_poly_points = None
 
-        s = self.get_cherry_stab_cutout_spacing(key_width = key_width)
+        s = self.get_cherry_stab_cutout_spacing(key_width=key_width)
 
         if s != -1:
             poly_points = [
-                [s - self.MAIN_BODY_SWITCH_SIDE_X_OFFSET -  self.kerf, -self.BAR_BOTTOM_Y -  self.kerf], # 0
-                [s - self.MAIN_BODY_SWITCH_SIDE_X_OFFSET -  self.kerf, -self.MAIN_BODY_BOTTOM_Y -  self.kerf], # 1
-                [s - self.COSTAR_NOTCH_SWITCH_SIDE_X_OFFSET -  self.kerf, -self.MAIN_BODY_BOTTOM_Y -  self.kerf], # 2
-                [s - self.COSTAR_NOTCH_SWITCH_SIDE_X_OFFSET -  self.kerf, -self.BOTTOM_NOTCH_BOTTOM_Y -  self.kerf], # 3
-                [s + self.COSTAR_NOTCH_SWITCH_SIDE_X_OFFSET + self.kerf, -self.BOTTOM_NOTCH_BOTTOM_Y -  self.kerf], # 4
-                [s + self.COSTAR_NOTCH_SWITCH_SIDE_X_OFFSET + self.kerf, -self.MAIN_BODY_BOTTOM_Y -  self.kerf], # 5
-                [s + self.MAIN_BODY_SWITCH_SIDE_X_OFFSET + self.kerf, -self.MAIN_BODY_BOTTOM_Y -  self.kerf], # 6
-                [s + self.MAIN_BODY_SWITCH_SIDE_X_OFFSET + self.kerf, -self.BAR_BOTTOM_Y -  self.kerf], # 7
-                [s + self.SIDE_NOTCH_FAR_SIDE_X_OFFSET + self.kerf, -self.BAR_BOTTOM_Y -  self.kerf], # 8
-                [s + self.SIDE_NOTCH_FAR_SIDE_X_OFFSET + self.kerf, self.SIDE_NOTCH_TOP_Y + self.kerf], # 9
-                [s + self.MAIN_BODY_SWITCH_SIDE_X_OFFSET + self.kerf, self.SIDE_NOTCH_TOP_Y + self.kerf], # 10
-                [s + self.MAIN_BODY_SWITCH_SIDE_X_OFFSET + self.kerf, self.MAIN_BODY_TOP_Y + self.kerf], # 11
-                [s + self.COSTAR_NOTCH_SWITCH_SIDE_X_OFFSET + self.kerf, self.MAIN_BODY_TOP_Y + self.kerf], # 12
-                [s + self.COSTAR_NOTCH_SWITCH_SIDE_X_OFFSET + self.kerf, self.TOP_NOTCH_TOP_Y + self.kerf], # 13
-                [s - self.COSTAR_NOTCH_SWITCH_SIDE_X_OFFSET -  self.kerf, self.TOP_NOTCH_TOP_Y + self.kerf], # 14
-                [s - self.COSTAR_NOTCH_SWITCH_SIDE_X_OFFSET -  self.kerf, self.MAIN_BODY_TOP_Y + self.kerf], # 15
-                [s - self.MAIN_BODY_SWITCH_SIDE_X_OFFSET -  self.kerf, self.MAIN_BODY_TOP_Y + self.kerf], # 16
-                [s - self.MAIN_BODY_SWITCH_SIDE_X_OFFSET -  self.kerf, self.BAR_BOTTOM_Y + self.kerf], # 17
-                [-s + self.MAIN_BODY_SWITCH_SIDE_X_OFFSET + self.kerf, self.BAR_BOTTOM_Y + self.kerf], # 18
-                [-s + self.MAIN_BODY_SWITCH_SIDE_X_OFFSET + self.kerf, -self.BAR_BOTTOM_Y -  self.kerf] #19
+                [
+                    s - self.MAIN_BODY_SWITCH_SIDE_X_OFFSET - self.kerf,
+                    -self.BAR_BOTTOM_Y - self.kerf,
+                ],  # 0
+                [
+                    s - self.MAIN_BODY_SWITCH_SIDE_X_OFFSET - self.kerf,
+                    -self.MAIN_BODY_BOTTOM_Y - self.kerf,
+                ],  # 1
+                [
+                    s - self.COSTAR_NOTCH_SWITCH_SIDE_X_OFFSET - self.kerf,
+                    -self.MAIN_BODY_BOTTOM_Y - self.kerf,
+                ],  # 2
+                [
+                    s - self.COSTAR_NOTCH_SWITCH_SIDE_X_OFFSET - self.kerf,
+                    -self.BOTTOM_NOTCH_BOTTOM_Y - self.kerf,
+                ],  # 3
+                [
+                    s + self.COSTAR_NOTCH_SWITCH_SIDE_X_OFFSET + self.kerf,
+                    -self.BOTTOM_NOTCH_BOTTOM_Y - self.kerf,
+                ],  # 4
+                [
+                    s + self.COSTAR_NOTCH_SWITCH_SIDE_X_OFFSET + self.kerf,
+                    -self.MAIN_BODY_BOTTOM_Y - self.kerf,
+                ],  # 5
+                [
+                    s + self.MAIN_BODY_SWITCH_SIDE_X_OFFSET + self.kerf,
+                    -self.MAIN_BODY_BOTTOM_Y - self.kerf,
+                ],  # 6
+                [
+                    s + self.MAIN_BODY_SWITCH_SIDE_X_OFFSET + self.kerf,
+                    -self.BAR_BOTTOM_Y - self.kerf,
+                ],  # 7
+                [
+                    s + self.SIDE_NOTCH_FAR_SIDE_X_OFFSET + self.kerf,
+                    -self.BAR_BOTTOM_Y - self.kerf,
+                ],  # 8
+                [
+                    s + self.SIDE_NOTCH_FAR_SIDE_X_OFFSET + self.kerf,
+                    self.SIDE_NOTCH_TOP_Y + self.kerf,
+                ],  # 9
+                [
+                    s + self.MAIN_BODY_SWITCH_SIDE_X_OFFSET + self.kerf,
+                    self.SIDE_NOTCH_TOP_Y + self.kerf,
+                ],  # 10
+                [
+                    s + self.MAIN_BODY_SWITCH_SIDE_X_OFFSET + self.kerf,
+                    self.MAIN_BODY_TOP_Y + self.kerf,
+                ],  # 11
+                [
+                    s + self.COSTAR_NOTCH_SWITCH_SIDE_X_OFFSET + self.kerf,
+                    self.MAIN_BODY_TOP_Y + self.kerf,
+                ],  # 12
+                [
+                    s + self.COSTAR_NOTCH_SWITCH_SIDE_X_OFFSET + self.kerf,
+                    self.TOP_NOTCH_TOP_Y + self.kerf,
+                ],  # 13
+                [
+                    s - self.COSTAR_NOTCH_SWITCH_SIDE_X_OFFSET - self.kerf,
+                    self.TOP_NOTCH_TOP_Y + self.kerf,
+                ],  # 14
+                [
+                    s - self.COSTAR_NOTCH_SWITCH_SIDE_X_OFFSET - self.kerf,
+                    self.MAIN_BODY_TOP_Y + self.kerf,
+                ],  # 15
+                [
+                    s - self.MAIN_BODY_SWITCH_SIDE_X_OFFSET - self.kerf,
+                    self.MAIN_BODY_TOP_Y + self.kerf,
+                ],  # 16
+                [
+                    s - self.MAIN_BODY_SWITCH_SIDE_X_OFFSET - self.kerf,
+                    self.BAR_BOTTOM_Y + self.kerf,
+                ],  # 17
+                [
+                    -s + self.MAIN_BODY_SWITCH_SIDE_X_OFFSET + self.kerf,
+                    self.BAR_BOTTOM_Y + self.kerf,
+                ],  # 18
+                [
+                    -s + self.MAIN_BODY_SWITCH_SIDE_X_OFFSET + self.kerf,
+                    -self.BAR_BOTTOM_Y - self.kerf,
+                ],  # 19
             ]
 
-            support_cutout_x = s - 3.375 -  (self.kerf * 2 )
-            support_cutout_y = 7.97 + (self.kerf * 2 )
-            support_cutout_w = (s + 4.375 + (self.kerf * 2 )) - (s - 4.375 -  (self.kerf * 2 ))
-            support_cutout_h = self.cherry_support_cutout_h + (self.kerf * 2 )
-            stab_bar_width = self.cherry_stab_bar_width + (self.kerf * 2 )
+            support_cutout_x = s - 3.375 - (self.kerf * 2)
+            support_cutout_y = 7.97 + (self.kerf * 2)
+            support_cutout_w = (s + 4.375 + (self.kerf * 2)) - (
+                s - 4.375 - (self.kerf * 2)
+            )
+            support_cutout_h = self.cherry_support_cutout_h + (self.kerf * 2)
+            stab_bar_width = self.cherry_stab_bar_width + (self.kerf * 2)
 
             support_cutout_poly_points = [
-                [(s - 4.375 -  (self.kerf * 2 )), (6.77 + (self.kerf * 2 ) + stab_bar_width)],
-                [(s - 4.375 -  (self.kerf * 2 )), (6.77 + (self.kerf * 2 )) + support_cutout_h],
-                [(s + 4.375 + (self.kerf * 2 )), (6.77 + (self.kerf * 2 )) + support_cutout_h],
-                [(s + 4.375 + (self.kerf * 2 )), (6.77 + (self.kerf * 2 ))],
-                [(-s + 3.375 + (self.kerf * 2 )), (6.77 + (self.kerf * 2 ))],
-                [(-s + 3.375 + (self.kerf * 2 )), (6.77 + (self.kerf * 2 ) + stab_bar_width)]
+                [
+                    (s - 4.375 - (self.kerf * 2)),
+                    (6.77 + (self.kerf * 2) + stab_bar_width),
+                ],
+                [
+                    (s - 4.375 - (self.kerf * 2)),
+                    (6.77 + (self.kerf * 2)) + support_cutout_h,
+                ],
+                [
+                    (s + 4.375 + (self.kerf * 2)),
+                    (6.77 + (self.kerf * 2)) + support_cutout_h,
+                ],
+                [(s + 4.375 + (self.kerf * 2)), (6.77 + (self.kerf * 2))],
+                [(-s + 3.375 + (self.kerf * 2)), (6.77 + (self.kerf * 2))],
+                [
+                    (-s + 3.375 + (self.kerf * 2)),
+                    (6.77 + (self.kerf * 2) + stab_bar_width),
+                ],
             ]
 
             self.logger.debug(support_cutout_poly_points)
@@ -285,33 +373,29 @@ class SwitchConfig:
 
         return None, None
 
-
-
     def cherry_stab_cutout(self, key_width: float = 1.0) -> tuple:
-
 
         support_cutout_poly_points = None
 
-        s = self.get_cherry_stab_cutout_spacing(key_width = key_width)
+        s = self.get_cherry_stab_cutout_spacing(key_width=key_width)
 
         if s != -1:
             poly_points = [
-                [s - 3.375 -  self.kerf, -2.3 -  self.kerf], # 0
-                [s - 3.375 -  self.kerf, -5.53 -  self.kerf], # 1
-                [s + 3.375 + self.kerf, -5.53 -  self.kerf], # 2
-                [s + 3.375 + self.kerf, -2.3 -  self.kerf], # 3
-                [s + 4.2 + self.kerf, -2.3 -  self.kerf], # 4
-                [s + 4.2 + self.kerf, 0.5 + self.kerf], # 5
-                [s + 3.375 + self.kerf, 0.5 + self.kerf], # 6
-                [s + 3.375 + self.kerf, 6.77 + self.kerf], # 7
-                [s + 1.65 + self.kerf, 6.77 + self.kerf], # 8
-                [s + 1.65 + self.kerf, 7.97 + self.kerf], # 9
-                [s - 1.65 -  self.kerf, 7.97 + self.kerf], # 10
-                [s - 1.65 -  self.kerf, 6.77 + self.kerf], # 11
-                [s - 3.375 -  self.kerf, 6.77 + self.kerf], # 12
-                [s - 3.375 -  self.kerf, 2.3 + self.kerf], # 13
-
-                [-s + 3.375 + self.kerf, 2.3 + self.kerf], # 14
+                [s - 3.375 - self.kerf, -2.3 - self.kerf],  # 0
+                [s - 3.375 - self.kerf, -5.53 - self.kerf],  # 1
+                [s + 3.375 + self.kerf, -5.53 - self.kerf],  # 2
+                [s + 3.375 + self.kerf, -2.3 - self.kerf],  # 3
+                [s + 4.2 + self.kerf, -2.3 - self.kerf],  # 4
+                [s + 4.2 + self.kerf, 0.5 + self.kerf],  # 5
+                [s + 3.375 + self.kerf, 0.5 + self.kerf],  # 6
+                [s + 3.375 + self.kerf, 6.77 + self.kerf],  # 7
+                [s + 1.65 + self.kerf, 6.77 + self.kerf],  # 8
+                [s + 1.65 + self.kerf, 7.97 + self.kerf],  # 9
+                [s - 1.65 - self.kerf, 7.97 + self.kerf],  # 10
+                [s - 1.65 - self.kerf, 6.77 + self.kerf],  # 11
+                [s - 3.375 - self.kerf, 6.77 + self.kerf],  # 12
+                [s - 3.375 - self.kerf, 2.3 + self.kerf],  # 13
+                [-s + 3.375 + self.kerf, 2.3 + self.kerf],  # 14
                 # [-s + 3.375 + self.kerf, 6.77 + self.kerf], # 15
                 # [-s + 1.65 + self.kerf, 6.77 + self.kerf], # 16
                 # [-s + 1.65 + self.kerf, 7.97 + self.kerf], # 17
@@ -323,23 +407,37 @@ class SwitchConfig:
                 # [-s - 4.2 -  self.kerf, -2.3 -  self.kerf], # 23
                 # [-s - 3.375 -  self.kerf, -2.3 -  self.kerf], # 24
                 # [-s - 3.375 -  self.kerf, -5.53 -  self.kerf], # 25
-                [-s + 3.375 + self.kerf, -5.53 -  self.kerf], # 26
-                [-s + 3.375 + self.kerf, -2.3 -  self.kerf], # 27
+                [-s + 3.375 + self.kerf, -5.53 - self.kerf],  # 26
+                [-s + 3.375 + self.kerf, -2.3 - self.kerf],  # 27
             ]
 
-            support_cutout_x = s - 3.375 -  (self.kerf * 2 )
-            support_cutout_y = 7.97 + (self.kerf * 2 )
-            support_cutout_w = (s + 4.375 + (self.kerf * 2 )) - (s - 4.375 -  (self.kerf * 2 ))
-            support_cutout_h = self.cherry_support_cutout_h + (self.kerf * 2 )
-            stab_bar_width = self.cherry_stab_bar_width + (self.kerf * 2 )
+            support_cutout_x = s - 3.375 - (self.kerf * 2)
+            support_cutout_y = 7.97 + (self.kerf * 2)
+            support_cutout_w = (s + 4.375 + (self.kerf * 2)) - (
+                s - 4.375 - (self.kerf * 2)
+            )
+            support_cutout_h = self.cherry_support_cutout_h + (self.kerf * 2)
+            stab_bar_width = self.cherry_stab_bar_width + (self.kerf * 2)
 
             support_cutout_poly_points = [
-                [(s - 4.375 -  (self.kerf * 2 )), (6.77 + (self.kerf * 2 ) + stab_bar_width)],
-                [(s - 4.375 -  (self.kerf * 2 )), (6.77 + (self.kerf * 2 )) + support_cutout_h],
-                [(s + 4.375 + (self.kerf * 2 )), (6.77 + (self.kerf * 2 )) + support_cutout_h],
-                [(s + 4.375 + (self.kerf * 2 )), (6.77 + (self.kerf * 2 ))],
-                [(-s + 3.375 + (self.kerf * 2 )), (6.77 + (self.kerf * 2 ))],
-                [(-s + 3.375 + (self.kerf * 2 )), (6.77 + (self.kerf * 2 ) + stab_bar_width)]
+                [
+                    (s - 4.375 - (self.kerf * 2)),
+                    (6.77 + (self.kerf * 2) + stab_bar_width),
+                ],
+                [
+                    (s - 4.375 - (self.kerf * 2)),
+                    (6.77 + (self.kerf * 2)) + support_cutout_h,
+                ],
+                [
+                    (s + 4.375 + (self.kerf * 2)),
+                    (6.77 + (self.kerf * 2)) + support_cutout_h,
+                ],
+                [(s + 4.375 + (self.kerf * 2)), (6.77 + (self.kerf * 2))],
+                [(-s + 3.375 + (self.kerf * 2)), (6.77 + (self.kerf * 2))],
+                [
+                    (-s + 3.375 + (self.kerf * 2)),
+                    (6.77 + (self.kerf * 2) + stab_bar_width),
+                ],
             ]
 
             self.logger.debug(support_cutout_poly_points)
@@ -348,44 +446,42 @@ class SwitchConfig:
 
         return None, None
 
-
-
     def costar_stab_cutout(self, key_width: float = 1.0) -> tuple:
         support_cutout_poly_points = None
 
-        s = self.get_cherry_stab_cutout_spacing(key_width = key_width)
+        s = self.get_cherry_stab_cutout_spacing(key_width=key_width)
 
         if s != -1:
             poly_points = [
-                [s - 1.65 -  self.kerf, -6.45 -  self.kerf], # 0
-                [s + 1.65 + self.kerf, -6.45 -  self.kerf], # 1
-                [s + 1.65 + self.kerf, 7.75 + self.kerf], # 2
-                [s - 1.65 -  self.kerf, 7.75 + self.kerf] # 3
+                [s - 1.65 - self.kerf, -6.45 - self.kerf],  # 0
+                [s + 1.65 + self.kerf, -6.45 - self.kerf],  # 1
+                [s + 1.65 + self.kerf, 7.75 + self.kerf],  # 2
+                [s - 1.65 - self.kerf, 7.75 + self.kerf],  # 3
             ]
 
             return poly_points, support_cutout_poly_points
 
         return None, None
 
-
     def alps_stab_cutout(self, key_width: float = 1.0) -> tuple:
-
 
         support_cutout_poly_points = None
 
-        s = self.get_alps_stab_cutout_spacing(key_width = key_width)
+        s = self.get_alps_stab_cutout_spacing(key_width=key_width)
 
         if s != -1:
             poly_points = [
-                [s - 1.333 -  self.kerf, 3.873 -  self.kerf], # 0
-                [s + 1.333 + self.kerf, 3.873 -  self.kerf], # 1
-                [s + 1.333 + self.kerf, 9.08 + self.kerf], # 2
-                [s - 1.333 -  self.kerf, 9.08 + self.kerf] # 3
+                [s - 1.333 - self.kerf, 3.873 - self.kerf],  # 0
+                [s + 1.333 + self.kerf, 3.873 - self.kerf],  # 1
+                [s + 1.333 + self.kerf, 9.08 + self.kerf],  # 2
+                [s - 1.333 - self.kerf, 9.08 + self.kerf],  # 3
             ]
 
             support_cutout_x = s - 2.133 - (self.kerf * 2)
             support_cutout_y = 9.08 - (self.kerf * 2) - 2
-            support_cutout_w = (s + 2.133 + (self.kerf * 2)) - (s - 2.133 -  (self.kerf * 2))
+            support_cutout_w = (s + 2.133 + (self.kerf * 2)) - (
+                s - 2.133 - (self.kerf * 2)
+            )
             support_cutout_h = 1.5 + (self.kerf * 2) + 2
 
             # support_cutout_poly_points = [
@@ -400,8 +496,11 @@ class SwitchConfig:
             support_cutout_poly_points = [
                 [support_cutout_x, support_cutout_y],
                 [support_cutout_x, support_cutout_y + support_cutout_h],
-                [support_cutout_x + support_cutout_w, support_cutout_y + support_cutout_h],
-                [support_cutout_x + support_cutout_w, support_cutout_y]
+                [
+                    support_cutout_x + support_cutout_w,
+                    support_cutout_y + support_cutout_h,
+                ],
+                [support_cutout_x + support_cutout_w, support_cutout_y],
             ]
 
             self.logger.debug(support_cutout_poly_points)
@@ -420,7 +519,7 @@ class SwitchConfig:
         ]
 
     def custom_stab_cutout(self, key_width: float = 1.0) -> tuple:
-        s = self.get_cherry_stab_cutout_spacing(key_width = key_width)
+        s = self.get_cherry_stab_cutout_spacing(key_width=key_width)
 
         if s != -1:
             radius = 1.0 # M2 clearance
@@ -433,15 +532,15 @@ class SwitchConfig:
             stab_cutout_poly_points = self.circle_points(s + d, distance, hole_radius, self.STAB_SCREW_HOLE_SEGMENTS)
 
             # the main stab cutout
-            hwidth = 3.6 # width = 6
-            hheight = 5.6 # height = 11
-            extra = 2 # extra clearance at the centerline for the bar
+            hwidth = 3.6  # width = 6
+            hheight = 5.6  # height = 11
+            extra = 2  # extra clearance at the centerline for the bar
             poly_points = [
-                [s - hwidth - self.kerf , -hheight - self.kerf], # 0
-                [s + hwidth + self.kerf , -hheight - self.kerf], # 1
-                [s + hwidth + self.kerf, hheight + self.kerf ],
-                [s  , hheight + extra + self.kerf],# arrow head to make room for the bar
-                [s - hwidth - self.kerf , hheight + self.kerf ] # 3
+                [s - hwidth - self.kerf, -hheight - self.kerf],  # 0
+                [s + hwidth + self.kerf, -hheight - self.kerf],  # 1
+                [s + hwidth + self.kerf, hheight + self.kerf],
+                [s, hheight + extra + self.kerf],  # arrow head to make room for the bar
+                [s - hwidth - self.kerf, hheight + self.kerf],  # 3
             ]
 
             test_points = [
@@ -457,18 +556,24 @@ class SwitchConfig:
             sheight = 10
             bar_length = 20
             bar_width = 2
-            offset = 0.5 # we shave an extra 0.5mm off the top but don't want to go all the way through the support
+            offset = 0.5  # we shave an extra 0.5mm off the top but don't want to go all the way through the support
 
             support_cutout_poly_points = [
-                [s - swidth - self.kerf , -sheight - self.kerf], # bottom left
-                [s + swidth + self.kerf , -sheight - self.kerf], # bottom right
-                [s + swidth + self.kerf, sheight + self.kerf + offset ], # top right
+                [s - swidth - self.kerf, -sheight - self.kerf],  # bottom left
+                [s + swidth + self.kerf, -sheight - self.kerf],  # bottom right
+                [s + swidth + self.kerf, sheight + self.kerf + offset],  # top right
                 [s - swidth - self.kerf - bar_length, sheight + self.kerf + offset],
-                [s - swidth - self.kerf - bar_length, sheight + self.kerf - bar_width ],
-                [s - swidth - self.kerf, sheight + self.kerf - bar_width]
+                [s - swidth - self.kerf - bar_length, sheight + self.kerf - bar_width],
+                [s - swidth - self.kerf, sheight + self.kerf - bar_width],
             ]
 
-
-            return poly_points, support_cutout_poly_points, [("stab_cutout", stab_cutout_poly_points), ("support_infill", test_points)]
+            return (
+                poly_points,
+                support_cutout_poly_points,
+                [
+                    ("stab_cutout", stab_cutout_poly_points),
+                    ("support_infill", test_points),
+                ],
+            )
 
         return None, None
