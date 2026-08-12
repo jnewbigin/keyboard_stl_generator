@@ -21,6 +21,7 @@ from solid.utils import *
 from cable import Cable
 from keyboard import Keyboard
 from parameters import Parameters
+from split_file import SplitFile, SplitFileError
 
 # Preview colors given to each section so the pieces are distinguishable in the
 # per-section, exploded and assembled scad views. color() only affects the
@@ -165,6 +166,15 @@ def main() -> None:
         default=False,
         action="store_true",
     )
+    parser.add_argument(
+        "--split-file",
+        metavar="split.json",
+        help="A JSON file recording how the board is split into sections. Written if it does not exist,"
+        " otherwise the recorded split is reused so a single section can be re-printed."
+        " Generation stops if the recorded split no longer holds",
+        default=None,
+        action=CheckExt({"json"}),
+    )
 
     # Parse command line arguments
     args = parser.parse_args()
@@ -274,9 +284,40 @@ def main() -> None:
     # Create Keyboard instance
     keyboard = Keyboard(parameters)
 
-    # Process the keyboard layout object
-    keyboard.process_keyboard_layout(keyboard_layout_dict)
+    # Reuse a previously recorded split, so that re-generating after a parameter
+    # change produces the very same sections and a single one can be re-printed.
+    # The split is decided while the layout is processed, so both steps share the
+    # error handling.
+    split_file_path = Path(args.split_file) if args.split_file is not None else None
+    saved_split_path = (
+        split_file_path
+        if split_file_path is not None and split_file_path.is_file()
+        else None
+    )
+
+    try:
+        if saved_split_path is not None:
+            keyboard.load_split(SplitFile.load(saved_split_path))
+        keyboard.process_keyboard_layout(keyboard_layout_dict)
+    except SplitFileError as error:
+        logger.error("Cannot reuse the saved split: %s", error)
+        print("ERROR:", error)
+        print(
+            f"Delete {saved_split_path} to plan a new split. The sections may then change,"
+            " so a section already printed may no longer fit its neighbours."
+        )
+        sys.exit(1)
+
     keyboard.process_custom_shapes()
+
+    if split_file_path is not None and saved_split_path is None:
+        try:
+            SplitFile.save(split_file_path, keyboard.current_split())
+        except OSError as error:
+            logger.error("Failed to write split file: %s", error)
+            print("ERROR:", error)
+            sys.exit(1)
+        print("Saved section split to", split_file_path)
 
     logger.debug("kerf: %f", keyboard.kerf)
 

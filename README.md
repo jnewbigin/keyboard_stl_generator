@@ -79,6 +79,23 @@ metrics (argument counts, statement counts and so on) are pylint's job, so the
 
 - **-s option**: This is used to generate just the model for a specific section
 
+- **--split-file option**: This records how the board was split into sections, so a later run can reproduce the very same split and a single section can be re-printed on its own
+
+  ```
+  poetry run python keyboard_stl_generator.py -i layout_filename.json -a --split-file split.json
+  ```
+
+  The first run writes the file. Every later run given the same option reuses what is in it instead of planning a fresh split, so tweaking an unrelated parameter cannot renumber the sections or shift a seam under a part that is already off the printer
+
+  A change that leaves the mating surfaces alone is fine: resizing a key in the middle of a section, a taller case, a roomier build plate. A change that would move a seam is not, and the run stops with an error rather than quietly handing back sections that no longer fit each other. That covers:
+
+  - a key at a seam has changed, or a whole row has shifted because a key before it got wider
+  - the interlocking finger size or the switch spacing has changed
+  - a section no longer fits the build plate
+  - a section has ended up with no keys, or the board has gained or lost a rotated cluster
+
+  When that happens, delete the split file and let it plan a fresh one, accepting that the sections may change and anything already printed may no longer fit
+
 ## Parameters
 - This is an example of a simple parameters file [parameters.json](/parameters.json)
 - Parameter files are parsed as [JSON5](https://json5.org/), so `//` and `/* */` comments and trailing commas are allowed. A plain JSON file is still valid JSON5. Files may be named `.json` or `.json5`
