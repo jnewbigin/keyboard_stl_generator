@@ -16,6 +16,7 @@ from parameters import Parameters
 from pcb import PCB
 from rotation_collection import RotationCollection
 from shape_cutout import ShapeCutout
+from split_file import SavedSplit, SeamBand, SplitFile, SplitFileError
 from support import Support
 from support_cutout import SupportCutout
 from support_properties import SupportProperties
@@ -84,6 +85,14 @@ class Keyboard:
         # splitter decides the seams (see _section_x_boundaries).
         self.planned_boundaries: list[float] | None = None
         self.split_recommendation: str | None = None
+
+        # A split restored from file pins the boundaries for a board the plain
+        # column splitter would otherwise re-plan. planned_boundaries stays None
+        # for those, so the bottom cover is still divided evenly rather than cut
+        # at the plate seams - just into the number of pieces it was saved with.
+        self.forced_boundaries: list[float] | None = None
+        self.forced_bottom_section_count: int | None = None
+        self.saved_split: SavedSplit | None = None
 
         self.cable = Cable(parameters)
 
@@ -600,7 +609,35 @@ class Keyboard:
     #     else:
     #         return union()
 
+    def load_split(self, saved: SavedSplit) -> None:
+        # Pin the split to a previously saved one. Must be called before
+        # process_keyboard_layout, which is what triggers the split.
+        self.saved_split = saved
+
+    def current_split(self) -> SavedSplit:
+        return SavedSplit(
+            footprint_planned=self.planned_boundaries is not None,
+            plate_mm=self.parameters.x_build_size,
+            bottom_section_count=self.get_bottom_section_count(),
+            boundaries=self._section_x_boundaries(),
+            section_widths=[
+                width for (width, _height) in self.get_top_section_dimensions()
+            ],
+            sections=[
+                [
+                    (SplitFile.round_unit(item.x), SplitFile.round_unit(item.y))
+                    for item in self._iter_collection_items(section)
+                ]
+                for section in self.switch_section_list
+            ],
+            seams=self.seam_profiles(),
+        )
+
     def split_keyboard(self) -> None:
+        if self.saved_split is not None:
+            self._split_keyboard_from_saved(self.saved_split)
+            return
+
         # Boards with rotated clusters (split/ergo layouts) can't be sectioned by
         # the plain column splitter below - it only sees the non-rotated keys and
         # would run a seam straight through a rotated cluster. Route those through
@@ -776,9 +813,17 @@ class Keyboard:
             board_left, board_right, plate, cluster_spans, safety
         )
         self.planned_boundaries = cuts
-        section_count = len(cuts) + 1
 
-        while len(self.switch_section_list) < section_count:
+        self._assign_sections_to_boundaries(cuts)
+
+        self.split_recommendation = self._describe_split(cuts, plate, fits)
+
+    def _assign_sections_to_boundaries(
+        self,
+        cuts: list[float],
+        key_sections: dict[tuple[float, float], int] | None = None,
+    ) -> None:
+        while len(self.switch_section_list) < len(cuts) + 1:
             self.switch_section_list.append(ItemCollection())
             self.support_section_list.append(ItemCollection())
             self.support_cutout_section_list.append(ItemCollection())
@@ -788,11 +833,21 @@ class Keyboard:
         # the cut placement, so the clip assigns them to the correct side without
         # them needing to live in a section collection (their local coordinates
         # would break the seam maths - that is a later step).
+        #
+        # key_sections restores a saved split. Its recorded sections win, because
+        # a staggered row can leave a key on the far side of the straight boundary
+        # from the section it was planned into. A key it does not name has been
+        # added or shifted since, so it falls back to the boundary; if that lands
+        # it somewhere that matters, the seam check will say so.
         for x in self.switch_collection.get_sorted_x_list():
             for y in self.switch_collection.get_sorted_y_list_in_x(x):
                 item = self.switch_collection.get_item(x, y)
                 centre = (item.x_start_mm + item.x_end_mm) / 2.0
                 section = sum(1 for cut in cuts if centre >= cut)
+                if key_sections is not None:
+                    section = key_sections.get(
+                        (SplitFile.round_unit(x), SplitFile.round_unit(y)), section
+                    )
                 self.switch_section_list[section].add_item(x, y, item)
                 self.support_section_list[section].add_item(
                     x, y, self.support_collection.get_item(x, y)
@@ -804,7 +859,105 @@ class Keyboard:
         for section_collection in self.switch_section_list:
             section_collection.set_collection_neighbors()
 
-        self.split_recommendation = self._describe_split(cuts, plate, fits)
+    def _split_keyboard_from_saved(self, saved: SavedSplit) -> None:
+        # Rebuild a recorded split rather than planning a fresh one, then prove it
+        # still describes this board: the same kind of planner, every section
+        # still populated, every seam unmoved and no section grown past the plate.
+        # Anything else and a section printed from the earlier run would no longer
+        # fit its neighbours, so refuse to build instead of quietly changing shape.
+        cluster_spans = self._rotated_cluster_spans()
+        if bool(cluster_spans) != saved.footprint_planned:
+            was = (
+                "rotated clusters" if saved.footprint_planned else "no rotated clusters"
+            )
+            raise SplitFileError(
+                f"the saved split was planned for a board with {was}, but this board is the other kind"
+            )
+
+        cuts = list(saved.boundaries)
+        self._assign_sections_to_boundaries(cuts, saved.key_sections())
+        if saved.footprint_planned:
+            self.planned_boundaries = cuts
+        else:
+            self.forced_boundaries = cuts
+            self.forced_bottom_section_count = saved.bottom_section_count
+
+        self._check_saved_cuts_clear_clusters(cuts, cluster_spans)
+        self._check_saved_sections_populated(cuts, cluster_spans)
+        self._check_saved_seams(saved)
+        self._check_saved_section_widths(saved)
+
+        if saved.footprint_planned:
+            plate = self.parameters.x_build_size
+            fits = all(hi - lo <= plate + 1e-6 for lo, hi in cluster_spans)
+            self.split_recommendation = self._describe_split(cuts, plate, fits)
+
+    def _check_saved_cuts_clear_clusters(
+        self, cuts: list[float], cluster_spans: list[tuple[float, float]]
+    ) -> None:
+        # Rotated keys never join a section collection, so the seam check cannot
+        # see them: a cluster that has shifted since the split was saved would let
+        # a cut land in the middle of it and the clip would saw through the switch
+        # cutouts. Hold a restored cut to the clearance plan_section_cuts gives a
+        # fresh one - it places a cut at exactly lo - safety, so compare with a
+        # tolerance rather than rejecting the split that was just saved.
+        safety = self.parameters.section_finger_depth + self.kerf + 1.0
+        for cut in cuts:
+            for low, high in cluster_spans:
+                if low - safety + 1e-6 < cut < high + safety - 1e-6:
+                    raise SplitFileError(
+                        f"the cut at x = {cut:.1f} mm now falls inside a rotated cluster "
+                        f"spanning x = {low:.1f} to {high:.1f} mm"
+                    )
+
+    def _check_saved_sections_populated(
+        self, cuts: list[float], cluster_spans: list[tuple[float, float]]
+    ) -> None:
+        # An empty section means the board no longer reaches that far, so the
+        # recorded split cannot be rebuilt. Read the restored collections, since
+        # that is what the geometry is cut from - the recorded assignment decides
+        # them, not the boundaries. A section may legitimately hold nothing but a
+        # rotated cluster, which never lands in a section collection.
+        edges = [-math.inf, *cuts, math.inf]
+        for section, (low, high) in enumerate(itertools.pairwise(edges)):
+            has_key = (
+                next(
+                    self._iter_collection_items(self.switch_section_list[section]), None
+                )
+                is not None
+            )
+            has_cluster = any(
+                span_low < high and span_high > low
+                for span_low, span_high in cluster_spans
+            )
+            if not (has_key or has_cluster):
+                raise SplitFileError(
+                    f"section {section} of the saved split holds no keys on this board"
+                )
+
+    def _check_saved_seams(self, saved: SavedSplit) -> None:
+        for section, (recorded, current) in enumerate(
+            zip(saved.seams, self.seam_profiles())
+        ):
+            mismatch = SplitFile.seam_mismatch(recorded, current)
+            if mismatch is not None:
+                raise SplitFileError(
+                    f"the seam between sections {section} and {section + 1} has moved: {mismatch}"
+                )
+
+    def _check_saved_section_widths(self, saved: SavedSplit) -> None:
+        # A section that already overflowed the plate it was planned against keeps
+        # its warning - it could never be loaded again otherwise. One that has
+        # only just outgrown the plate is fatal, since it can no longer be
+        # printed at all.
+        plate = self.parameters.x_build_size
+        widths = [width for (width, _height) in self.get_top_section_dimensions()]
+        for section, (width, recorded) in enumerate(zip(widths, saved.section_widths)):
+            if width > plate + 1e-6 and recorded <= saved.plate_mm + 1e-6:
+                raise SplitFileError(
+                    f"section {section} is now {width:.1f} mm wide and no longer fits the {plate:.1f} mm "
+                    f"build plate (it was {recorded:.1f} mm when the split was saved)"
+                )
 
     def _describe_split(self, cuts: list[float], plate: float, fits: bool) -> str:
         # Report the true section widths (these include the seam's finger/weave
@@ -973,7 +1126,9 @@ class Keyboard:
         #
         # A footprint-planned board (rotated clusters) has already chosen cuts in
         # the real gaps; use them verbatim so the seam sits where a cluster is
-        # kept whole.
+        # kept whole. A split restored from file pins them the same way.
+        if self.forced_boundaries is not None:
+            return list(self.forced_boundaries)
         if self.planned_boundaries is not None:
             return list(self.planned_boundaries)
         U = self.parameters.U
@@ -1005,6 +1160,36 @@ class Keyboard:
                 seam = min(max(gap_centre, left_key_right), right_key_left)
             boundaries.append(seam)
         return boundaries
+
+    def seam_profiles(self) -> list[list[SeamBand]]:
+        # The mating surface between each adjacent pair of sections, as
+        # (y_start_mm, y_end_mm, seam_x_mm) bands - the same seam get_section_x_clip
+        # cuts against, in the same y bands.
+        #
+        # Neighbouring bands sharing a seam x are merged, so the profile describes
+        # the polyline itself rather than how the board happened to be sliced into
+        # bands. That is what lets a key added or resized inside a section - which
+        # splits a band without moving the seam - compare equal.
+        U = self.parameters.U
+        boundaries = self._section_x_boundaries()
+        edges = self._board_y_band_edges()
+        profiles = []
+        for boundary_index in range(len(boundaries)):
+            bands: list[list[float]] = []
+            for lo, hi in itertools.pairwise(edges):
+                if hi - lo < 1e-9:
+                    continue
+                seam = self._section_seam_x(boundary_index, boundaries, (lo + hi) / 2.0)
+                if (
+                    bands
+                    and abs(bands[-1][2] - seam) < 1e-9
+                    and abs(bands[-1][1] - U(lo)) < 1e-9
+                ):
+                    bands[-1][1] = U(hi)
+                else:
+                    bands.append([U(lo), U(hi), seam])
+            profiles.append([(band[0], band[1], band[2]) for band in bands])
+        return profiles
 
     def _section_seam_x(
         self, boundary_index: int, boundaries: list[float], mid_y: float
@@ -1107,20 +1292,13 @@ class Keyboard:
 
         return clip
 
-    def get_bottom_section_remove_block(self, section_number: int) -> OpenSCADObject:
-
-        # section = self.switch_section_list[section_number]
-
-        self.logger.debug("Get Section %d", section_number)
-
-        self.logger.debug("real_case_width: %f", self.parameters.real_case_width)
-        self.logger.debug("real_case_height: %f", self.parameters.real_case_height)
-
+    def get_bottom_section_span(self, section_number: int) -> tuple[float, float]:
+        # The x range (mm) of the bottom cover this section keeps.
         if self.planned_boundaries is not None:
             # Split the bottom cover at the same footprint-planned boundaries as
             # the plate. start_x = boundary + right_margin lines the slab up with
-            # the top seam once both are shifted into place (x_offset below undoes
-            # the right_margin). Outer sections run well past the case edge.
+            # the top seam once both are shifted into place (the caller's x_offset
+            # undoes the right_margin). Outer sections run well past the case edge.
             cuts = self.planned_boundaries
             last = len(cuts)
             rm = self.parameters.right_margin
@@ -1130,16 +1308,25 @@ class Keyboard:
                 if section_number == last
                 else cuts[section_number] + rm
             )
-        else:
-            assert self.parameters.bottom_section_count is not None
-            section_size = (
-                self.parameters.real_case_width / self.parameters.bottom_section_count
-            )
+            return (start_x, end_x)
 
-            self.logger.debug("section_size: %f", section_size)
+        # get_bottom_section_count, not the parameter behind it: a restored split
+        # pins the number of pieces, and each one has to be sized for the same
+        # count that is being generated.
+        section_size = self.parameters.real_case_width / self.get_bottom_section_count()
+        self.logger.debug("section_size: %f", section_size)
+        return (section_size * section_number, section_size * (section_number + 1))
 
-            start_x = section_size * section_number
-            end_x = start_x + section_size
+    def get_bottom_section_remove_block(self, section_number: int) -> OpenSCADObject:
+
+        # section = self.switch_section_list[section_number]
+
+        self.logger.debug("Get Section %d", section_number)
+
+        self.logger.debug("real_case_width: %f", self.parameters.real_case_width)
+        self.logger.debug("real_case_height: %f", self.parameters.real_case_height)
+
+        (start_x, end_x) = self.get_bottom_section_span(section_number)
 
         (start_x, end_x) = self.get_screw_support_interference_offset(start_x, end_x)
 
@@ -1254,5 +1441,17 @@ class Keyboard:
     def get_bottom_section_count(self) -> int:
         if self.planned_boundaries is not None:
             return len(self.planned_boundaries) + 1
-        assert self.parameters.bottom_section_count is not None
-        return self.parameters.bottom_section_count
+        # A restored split pins the count. Otherwise Parameters holds it, but is
+        # only told the board size once the geometry is built and works the count
+        # out from a zero-width case until then, so size it here when the split
+        # asks this early.
+        count = self.forced_bottom_section_count or self.parameters.bottom_section_count
+        if count:
+            return count
+        (_min_x, max_x, _max_y, _min_y) = self._full_board_bounds()
+        case_width = (
+            self.parameters.U(max_x)
+            + self.parameters.left_margin
+            + self.parameters.right_margin
+        )
+        return math.ceil(case_width / self.parameters.x_build_size)
