@@ -103,6 +103,12 @@ class Parameters:
         self.section_finger_depth = 4.0
         self.section_finger_height = 2.0
 
+        # Every step in the finger seam leaves one 90-degree corner sticking
+        # out on the tab side. A print's slight over-extrusion right at that
+        # corner is enough to stop two sections sliding together, so bevel it
+        # by this much (mm) on each leg. 0 leaves the corner square.
+        self.section_finger_chamfer = 0.3
+
         self.switch_type = "mx_openable"
         self.stabilizer_type = "cherry_costar"
 

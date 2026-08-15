@@ -348,3 +348,100 @@ class TestSharedSectionSeams:
         assert flat != fingered
         # Every fingered seam stays within a finger depth of the butt-joint seam.
         assert all(abs(f - b) <= 4.0 + 1e-6 for f, b in zip(fingered, flat))
+
+
+class TestFingerChamferCorners:
+    # These exercise the pure corner math directly with hand-built seams/edges
+    # (edges in key units, seams in mm, matching what get_section_x_clip
+    # passes in) rather than a real board's finger seam, the same way
+    # TestAssignXSections drives the seam splitter directly.
+
+    def test_flat_seam_has_no_corners(self):
+        keyboard = build_keyboard("wide_board.json", x_build_size=300)
+        edges = [0.0, 1.0, 2.0, 3.0]
+        seams = [10.0, 10.0, 10.0]
+        assert keyboard._finger_chamfer_corners(seams, edges, 0.3, "max") == []
+        assert keyboard._finger_chamfer_corners(seams, edges, 0.3, "min") == []
+
+    def test_step_up_is_chamfered_on_the_tab_corner_only(self):
+        # Seam steps from 10mm to 15mm between the last two bands: the tab
+        # (wider) band is the one above the step.
+        keyboard = build_keyboard("wide_board.json", x_build_size=300)
+        U = keyboard.parameters.U
+        edges = [0.0, 1.0, 2.0, 3.0]
+        seams = [10.0, 10.0, 15.0]
+
+        corners = keyboard._finger_chamfer_corners(seams, edges, 0.3, "max")
+        assert len(corners) == 1
+        tip_x, edge_y, x_sign, y_sign, leg = corners[0]
+        assert tip_x == 15.0  # the tab band's own seam value
+        assert edge_y == pytest.approx(U(edges[2]))
+        assert x_sign == -1.0  # bevels into this (left-of-seam) section
+        assert y_sign == 1.0  # the tab band sits above the step
+        assert leg == pytest.approx(0.3)
+
+    def test_mirror_side_chamfers_the_other_corner(self):
+        # Same step, but from the neighbouring section's (right-of-seam) side:
+        # its own tab corner is the complementary one, at the narrower value.
+        keyboard = build_keyboard("wide_board.json", x_build_size=300)
+        edges = [0.0, 1.0, 2.0, 3.0]
+        seams = [10.0, 10.0, 15.0]
+
+        corners = keyboard._finger_chamfer_corners(seams, edges, 0.3, "min")
+        assert len(corners) == 1
+        tip_x, _edge_y, x_sign, y_sign, leg = corners[0]
+        assert tip_x == 10.0
+        assert x_sign == 1.0
+        assert y_sign == -1.0  # this section's tab band sits below the step
+        assert leg == pytest.approx(0.3)
+
+    def test_chamfer_is_clamped_to_the_step_width(self):
+        keyboard = build_keyboard("wide_board.json", x_build_size=300)
+        edges = [0.0, 1.0, 2.0, 3.0]
+        seams = [10.0, 10.0, 10.2]  # a tiny 0.2mm step, smaller than the 0.3mm ask
+
+        corners = keyboard._finger_chamfer_corners(seams, edges, 0.3, "max")
+        assert len(corners) == 1
+        *_rest, leg = corners[0]
+        assert leg == pytest.approx(0.2)
+
+    def test_chamfer_is_clamped_to_half_the_tab_bands_height(self):
+        keyboard = build_keyboard("wide_board.json", x_build_size=300)
+        U = keyboard.parameters.U
+        # The tab band above the step is only 0.001u (~0.02mm) tall, narrower
+        # than the 0.3mm chamfer ask. Clamped to half so a chamfer on this
+        # band's other edge (if any) can never overlap this one.
+        edges = [0.0, 1.0, 1.001]
+        seams = [10.0, 15.0]
+
+        corners = keyboard._finger_chamfer_corners(seams, edges, 0.3, "max")
+        assert len(corners) == 1
+        *_rest, leg = corners[0]
+        assert leg == pytest.approx(U(0.001) / 2.0)
+
+    def test_opposing_steps_in_the_same_tab_band_do_not_overlap(self):
+        # A short tab band (edges[1:3]) stepped out then back in leaves a
+        # convex corner on both of its own edges. With a huge chamfer ask,
+        # each corner must clamp to at most half the band's height so the two
+        # wedges meet without crossing into each other.
+        keyboard = build_keyboard("wide_board.json", x_build_size=300)
+        U = keyboard.parameters.U
+        edges = [0.0, 1.0, 1.05, 2.0]
+        seams = [10.0, 15.0, 10.0]
+
+        corners = keyboard._finger_chamfer_corners(seams, edges, 100.0, "max")
+        assert len(corners) == 2
+        band_height = U(edges[2] - edges[1])
+        legs = [leg for *_rest, leg in corners]
+        assert all(leg == pytest.approx(band_height / 2.0) for leg in legs)
+        assert sum(legs) <= band_height + 1e-9
+
+    def test_get_section_x_clip_tolerates_zero_chamfer(self):
+        keyboard = build_keyboard("wide_board.json", x_build_size=300)
+        keyboard.parameters.section_finger_chamfer = 0.0
+        assert keyboard.get_section_x_clip(0, 100.0, 50.0) is not None
+
+    def test_get_section_x_clip_builds_with_default_chamfer(self):
+        keyboard = build_keyboard("wide_board.json", x_build_size=300)
+        assert keyboard.parameters.section_finger_chamfer > 0
+        assert keyboard.get_section_x_clip(0, 100.0, 50.0) is not None
