@@ -1261,17 +1261,33 @@ class Keyboard:
         )
         remove_block_length = (plate_width * 3.0) + 100.0
 
+        # Bands closer together than this are float noise from
+        # _board_y_band_edges rather than a real row boundary - collapse them
+        # so the rectangular cuts and the finger chamfer corners agree on
+        # exactly the same set of bands.
         edges = self._board_y_band_edges()
+        edges = [
+            edge for i, edge in enumerate(edges) if i == 0 or edge - edges[i - 1] > 1e-9
+        ]
+        mids = [(lo + hi) / 2.0 for lo, hi in itertools.pairwise(edges)]
 
-        for lo, hi in itertools.pairwise(edges):
-            if hi - lo < 1e-9:
-                continue
-            mid = (lo + hi) / 2.0
+        right_seams = (
+            [self._section_seam_x(section_number, boundaries, mid) for mid in mids]
+            if section_number < section_count - 1
+            else None
+        )
+        left_seams = (
+            [self._section_seam_x(section_number - 1, boundaries, mid) for mid in mids]
+            if section_number > 0
+            else None
+        )
+
+        for band_index, (lo, hi) in enumerate(itertools.pairwise(edges)):
             y_offset = U(lo) - self.kerf
             bar_height = U(hi - lo) + (self.kerf * 2)
 
-            if section_number < section_count - 1:
-                right_seam = self._section_seam_x(section_number, boundaries, mid)
+            if right_seams is not None:
+                right_seam = right_seams[band_index]
                 clip += down(remove_block_z_offset)(
                     right(right_seam)(
                         forward(y_offset)(
@@ -1280,8 +1296,8 @@ class Keyboard:
                     )
                 )
 
-            if section_number > 0:
-                left_seam = self._section_seam_x(section_number - 1, boundaries, mid)
+            if left_seams is not None:
+                left_seam = left_seams[band_index]
                 clip += down(remove_block_z_offset)(
                     right(left_seam - remove_block_length)(
                         forward(y_offset)(
@@ -1290,7 +1306,80 @@ class Keyboard:
                     )
                 )
 
+        chamfer = self.parameters.section_finger_chamfer
+        if chamfer > 0:
+            for seams, tip in ((right_seams, "max"), (left_seams, "min")):
+                if seams is None:
+                    continue
+                clip += down(remove_block_z_offset)(
+                    self._finger_chamfer_cuts(
+                        seams, edges, chamfer, tip, remove_block_height
+                    )
+                )
+
         return clip
+
+    def _finger_chamfer_corners(
+        self, seams: list[float], edges: list[float], chamfer: float, tip: str
+    ) -> list[tuple[float, float, float, float, float]]:
+        # Wherever a finger seam steps sideways between two y-bands, the tab
+        # side of the step leaves one right-angle corner exposed (the notch
+        # side leaves the complementary reflex corner, which needs no bevel -
+        # nothing juts out there for a mating part to catch on). tip="max"
+        # finds that corner for the section left of the seam, tip="min" for
+        # the section right of it - the two sections never share a corner,
+        # since a 90-degree material angle on one side is a 270-degree
+        # (reflex) angle on the other.
+        #
+        # Returns (tip_x, edge_y, x_sign, y_sign, leg) in mm: cut a right
+        # triangle of leg length `leg` from (tip_x, edge_y), running x_sign
+        # along x and y_sign along y, to bevel that one corner.
+        U = self.parameters.U
+        x_sign = -1.0 if tip == "max" else 1.0
+        corners = []
+        for index in range(1, len(seams)):
+            seam_below, seam_above = seams[index - 1], seams[index]
+            step = seam_above - seam_below
+            if abs(step) < 1e-9:
+                continue
+            tip_x = (
+                max(seam_below, seam_above)
+                if tip == "max"
+                else min(seam_below, seam_above)
+            )
+            wide_band_above = abs(seam_above - tip_x) < 1e-9
+            y_sign = 1.0 if wide_band_above else -1.0
+            wide_band_height = U(
+                (edges[index + 1] - edges[index])
+                if wide_band_above
+                else (edges[index] - edges[index - 1])
+            )
+            # Halved: the tab band's other edge may have its own step and thus
+            # its own chamfer eating into the same band from the far side, so
+            # neither one alone may claim more than half the band's height.
+            leg = min(chamfer, abs(step), wide_band_height / 2.0)
+            if leg <= 1e-9:
+                continue
+            corners.append((tip_x, U(edges[index]), x_sign, y_sign, leg))
+        return corners
+
+    def _finger_chamfer_cuts(
+        self,
+        seams: list[float],
+        edges: list[float],
+        chamfer: float,
+        tip: str,
+        remove_block_height: float,
+    ) -> OpenSCADObject:
+        cuts = union()
+        for tip_x, edge_y, x_sign, y_sign, leg in self._finger_chamfer_corners(
+            seams, edges, chamfer, tip
+        ):
+            wedge = polygon([[0, 0], [x_sign * leg, 0], [0, y_sign * leg]])
+            cuts += translate([tip_x, edge_y, 0])(
+                linear_extrude(height=remove_block_height)(wedge)
+            )
+        return cuts
 
     def get_bottom_section_span(self, section_number: int) -> tuple[float, float]:
         # The x range (mm) of the bottom cover this section keeps.

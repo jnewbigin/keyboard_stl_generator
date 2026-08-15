@@ -178,6 +178,11 @@
             "exclusiveMinimum": 0,
             "description": "How far, in key units, the seam travels before the finger alternates to the other side."
         },
+        "section_finger_chamfer": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Size in mm of the chamfer on the external corner where a section finger steps sideways. 0 leaves the corner square."
+        },
 
         "screw_count": {
             "type": "integer",
