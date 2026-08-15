@@ -11,6 +11,14 @@ from support_properties import SupportProperties
 
 class Support(Cell):
 
+    # Every cube in this file that would otherwise share a face exactly with
+    # the plate slab or a neighbouring cell is padded by this much in X/Y, so
+    # boolean engines see a genuine overlap instead of an exact coincidence
+    # (which is prone to producing non-manifold geometry). switch_support(),
+    # switch_support_outline() and switch_support_fillet() must all agree on
+    # this value so the skirt wall and its fillet still meet flush.
+    SKIRT_XY_OVERLAP = 0.05
+
     def __init__(
         self,
         props: CellProperties,
@@ -54,16 +62,20 @@ class Support(Cell):
         # skirt downward by z_offset so that once get_moved() lifts the whole
         # support by z_offset the skirt still lands on the base plate.
         skirt_drop = self.support_bar_height + self.z_offset
+        eps = self.SKIRT_XY_OVERLAP
 
         d = down(skirt_drop / 2)(
-            cube([self.w_mm, self.h_mm, skirt_drop + self.plate_thickness], center=True)
+            cube(
+                [self.w_mm + eps, self.h_mm + eps, skirt_drop + self.plate_thickness],
+                center=True,
+            )
         )
 
         d -= down(skirt_drop / 2)(
             cube(
                 [
-                    self.w_mm - (self.support_bar_width / 2),
-                    self.h_mm - (self.support_bar_width / 2),
+                    self.w_mm + eps - (self.support_bar_width / 2),
+                    self.h_mm + eps - (self.support_bar_width / 2),
                     skirt_drop * 2,
                 ],
                 center=True,
@@ -86,8 +98,15 @@ class Support(Cell):
         # gussets outside the opening survive.
         f = self.support_bar_fillet
 
-        inner_x = (self.w_mm - (self.support_bar_width / 2)) / 2
-        inner_y = (self.h_mm - (self.support_bar_width / 2)) / 2
+        # Match switch_support_outline()'s expanded footprint so the band
+        # still reaches the skirt's inner wall exactly, rather than falling
+        # short of it by SKIRT_XY_OVERLAP / 2.
+        inner_x = (
+            self.w_mm + self.SKIRT_XY_OVERLAP - (self.support_bar_width / 2)
+        ) / 2
+        inner_y = (
+            self.h_mm + self.SKIRT_XY_OVERLAP - (self.support_bar_width / 2)
+        ) / 2
 
         f = min(f, inner_x, inner_y)
         if f <= 0:
@@ -114,7 +133,11 @@ class Support(Cell):
 
     def switch_support(self) -> OpenSCADObject:
 
-        d = cube([self.w_mm, self.h_mm, self.plate_thickness], center=True)
+        eps = self.SKIRT_XY_OVERLAP
+        d = cube(
+            [self.w_mm + eps, self.h_mm + eps, self.plate_thickness],
+            center=True,
+        )
 
         if self.set_to_origin:
             d = right(self.w_mm / 2)(back(self.h_mm / 2)(d))
