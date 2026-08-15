@@ -543,13 +543,6 @@ class SwitchConfig:
                 [s - hwidth - self.kerf, hheight + self.kerf],  # 3
             ]
 
-            test_points = [
-                [s - 1, -1],
-                [s + 1, -1],
-                [s + 1, 1],
-                [s - 1, 1],
-            ]
-
             # copied from alps_stab_cutout
             # clear the support area around the stabs
             swidth = 4.2
@@ -572,7 +565,6 @@ class SwitchConfig:
                 support_cutout_poly_points,
                 [
                     ("stab_cutout", stab_cutout_poly_points),
-                    ("support_infill", test_points),
                 ],
             )
 

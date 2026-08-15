@@ -239,7 +239,6 @@ class Switch(Cell):
         # multiple polygons
         # cutout
         # support_cutout
-        # support_infill
         for advanced in advanced_poly_points:
             action, poly_points = advanced
             poly_path = [range(len(poly_points))]
@@ -261,14 +260,6 @@ class Switch(Cell):
 
                 # and then extrude down to remove supports
                 cutout += down((10 / 2) + (self.parameters.plate_thickness / 2))(
-                    linear_extrude(height=10, center=True)(support_cutout)
-                )
-            elif action == "support_infill":
-                # support cutout it mirrored to each side of the switch
-                support_cutout = advanced_polygon + mirror([1, 0, 0])(advanced_polygon)
-
-                # and then extrude down to remove supports
-                infill = down((10 / 2) + (self.parameters.plate_thickness / 2))(
                     linear_extrude(height=10, center=True)(support_cutout)
                 )
             else:
